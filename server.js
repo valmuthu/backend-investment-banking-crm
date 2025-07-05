@@ -1,70 +1,176 @@
-// Updated Contact Schema in server.js - replace the existing contactSchema
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config();
 
-const contactSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-  name: { type: String, required: true, trim: true },
-  position: { type: String, trim: true },
-  email: { 
-    type: String, 
-    lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
-  phone: { type: String, trim: true },
-  linkedin: { type: String, trim: true },
-  firm: { type: String, required: true, trim: true },
-  networkingStatus: { 
-    type: String, 
-    enum: [
-      'To Be Contacted',
-      'Initial Outreach Sent', 
-      'Follow up Call Scheduled',
-      'Intro Call Complete',
-      'Follow up Email Sent',
-      'Meeting Scheduled',
-      'Regular Contact'
-    ],
-    default: 'To Be Contacted'
-  },
-  networkingDate: { type: String }, // Using String to match frontend date format
-  nextSteps: { 
-    type: String,
-    enum: [
-      'Send Initial Outreach',
-      'Follow up Email',
-      'Schedule Call',
-      'Prepare for Upcoming Call',
-      'Send Thank You Email',
-      'Schedule Intro Call',
-      'Send Resume',
-      'Send Thank You Note',
-      'Schedule Follow-up Meeting',
-      'Send Proposal',
-      'Prepare Interview Materials',
-      'Complete Application',
-      'No Action Required',
-      '' // Allow empty
-    ]
-  },
-  nextStepsDate: { type: String }, // Using String to match frontend date format
-  referred: { type: Boolean, default: false },
-  notes: { type: String },
-  hasInterview: { type: Boolean, default: false },
-  interviewStatus: { 
-    type: String,
-    enum: [
-      'Not Applied',
-      'Applied', 
-      'Phone Screen',
-      'First Round',
-      'Second Round', 
-      'Final Round',
-      'Offer',
-      'Rejected',
-      'Add Interview',
-      '' // Allow empty
-    ]
-  },
-  interviewDate: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false // Disable for API
+}));
+app.use(compression());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    message: 'Too many requests from this IP, please try again later',
+    code: 'RATE_LIMITED'
+  }
 });
+app.use(limiter);
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      : ['http://localhost:3000', 'http://localhost:5173'];
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Connect to MongoDB
+const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+    process.exit(1);
+  }
+};
+
+// Connect to database
+connectDB();
+
+// Import routes
+const apiRoutes = require('./routes');
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '2.0.0',
+    uptime: process.uptime(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// API routes
+app.use('/api/v1', apiRoutes);
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Investment Banking CRM API',
+    version: '2.0.0',
+    description: 'Backend API for Investment Banking CRM application',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      api: '/api/v1',
+      auth: '/api/v1/auth',
+      contacts: '/api/v1/contacts',
+      interviews: '/api/v1/interviews',
+      dashboard: '/api/v1/dashboard'
+    }
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    message: 'Route not found',
+    code: 'ROUTE_NOT_FOUND',
+    requestedUrl: req.originalUrl
+  });
+});
+
+// Global error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  
+  // Don't leak error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(error.status || 500).json({
+    message: error.message || 'Internal server error',
+    code: error.code || 'INTERNAL_ERROR',
+    ...(isDevelopment && { stack: error.stack })
+  });
+});
+
+// Graceful shutdown handlers
+const gracefulShutdown = (signal) => {
+  console.log(`\n🛑 ${signal} received, closing HTTP server...`);
+  
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    
+    mongoose.connection.close(false, () => {
+      console.log('✅ MongoDB connection closed');
+      process.exit(0);
+    });
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔗 API base: http://localhost:${PORT}/api/v1`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.error('❌ Unhandled Promise Rejection:', err.message);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err.message);
+  process.exit(1);
+});
+
+module.exports = app;
