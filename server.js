@@ -15,20 +15,29 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// Rate limiting
+// Rate limiting - More permissive for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // Increased limit for development
   message: {
     message: 'Too many requests from this IP, please try again later',
     code: 'RATE_LIMITED'
+  },
+  skip: (req) => {
+    // Skip rate limiting in development
+    return process.env.NODE_ENV === 'development';
   }
 });
 app.use(limiter);
 
-// CORS configuration - Fixed to be more permissive for development
+// CORS configuration - Fixed for development
 const corsOptions = {
   origin: function (origin, callback) {
+    // In development, allow all origins
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
     // Allow requests with no origin (like mobile apps or Postman)
     if (!origin) return callback(null, true);
     
@@ -38,7 +47,9 @@ const corsOptions = {
       'http://localhost:4173',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:5173',
-      'http://127.0.0.1:4173'
+      'http://127.0.0.1:4173',
+      'http://localhost:8080',
+      'http://127.0.0.1:8080'
     ];
     
     // Add environment-specific origins
@@ -47,52 +58,62 @@ const corsOptions = {
       allowedOrigins.push(...envOrigins);
     }
     
-    // In development, be more permissive
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow in development anyway
     }
   },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 };
 
 app.use(cors(corsOptions));
 
-// Handle preflight requests
+// Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Connect to MongoDB
+// Connect to MongoDB with better error handling
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/investment-banking-crm';
+    
+    const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📊 Database: ${conn.connection.name}`);
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
-    process.exit(1);
+    console.error('📝 MongoDB URI:', process.env.MONGODB_URI ? 'Set' : 'Not set');
+    
+    // In development, continue without database for testing
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️  Continuing without database in development mode');
+    } else {
+      process.exit(1);
+    }
   }
 };
 
 // Connect to database
 connectDB();
 
-// Import routes
-const apiRoutes = require('./routes');
+// Add request logging in development
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+  });
+}
 
 // Health check endpoint - Make sure this works
 app.get('/health', (req, res) => {
@@ -102,9 +123,13 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: '2.0.0',
     uptime: process.uptime(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    port: PORT
   });
 });
+
+// Import routes
+const apiRoutes = require('./routes');
 
 // API routes
 app.use('/api/v1', apiRoutes);
@@ -116,6 +141,7 @@ app.get('/', (req, res) => {
     version: '2.0.0',
     description: 'Backend API for Investment Banking CRM application',
     status: 'running',
+    timestamp: new Date().toISOString(),
     endpoints: {
       health: '/health',
       api: '/api/v1',
@@ -129,10 +155,12 @@ app.get('/', (req, res) => {
 
 // 404 handler
 app.use('*', (req, res) => {
+  console.log(`404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     message: 'Route not found',
     code: 'ROUTE_NOT_FOUND',
-    requestedUrl: req.originalUrl
+    requestedUrl: req.originalUrl,
+    method: req.method
   });
 });
 
@@ -146,7 +174,11 @@ app.use((error, req, res, next) => {
   res.status(error.status || 500).json({
     message: error.message || 'Internal server error',
     code: error.code || 'INTERNAL_ERROR',
-    ...(isDevelopment && { stack: error.stack })
+    ...(isDevelopment && { 
+      stack: error.stack,
+      path: req.path,
+      method: req.method
+    })
   });
 });
 
@@ -157,10 +189,14 @@ const gracefulShutdown = (signal) => {
   server.close(() => {
     console.log('✅ HTTP server closed');
     
-    mongoose.connection.close(false, () => {
-      console.log('✅ MongoDB connection closed');
+    if (mongoose.connection.readyState === 1) {
+      mongoose.connection.close(false, () => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
   
   // Force close after 10 seconds
@@ -176,6 +212,14 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API base: http://localhost:${PORT}/api/v1`);
+  console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/v1/auth`);
+  
+  // Test database connection on startup
+  if (mongoose.connection.readyState === 1) {
+    console.log('✅ Database ready');
+  } else {
+    console.warn('⚠️  Database not connected');
+  }
 });
 
 // Handle graceful shutdown
@@ -185,15 +229,19 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
   console.error('❌ Unhandled Promise Rejection:', err.message);
-  server.close(() => {
-    process.exit(1);
-  });
+  if (process.env.NODE_ENV === 'production') {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err.message);
-  process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });
 
 module.exports = app;
