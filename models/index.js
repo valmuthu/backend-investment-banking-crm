@@ -7,8 +7,7 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     lowercase: true,
-    trim: true,
-    index: true
+    trim: true
   },
   passwordHash: {
     type: String,
@@ -20,87 +19,29 @@ const userSchema = new mongoose.Schema({
     default: 'user'
   },
   profile: {
-    firstName: { type: String, default: '' },
-    lastName: { type: String, default: '' },
+    firstName: String,
+    lastName: String,
     university: String,
-    graduationYear: Number,
-    phoneNumber: String,
-    linkedinUrl: String
+    graduationYear: Number
   },
   refreshTokens: [String],
   lastLogin: Date,
   loginAttempts: { type: Number, default: 0 },
-  lockUntil: Date,
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
-  }
+  lockUntil: Date
 }, {
   timestamps: true
 });
 
-// Create indexes for user schema
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ status: 1 });
-
 // Contact Schema - Matches your frontend exactly
 const contactSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'User', 
-    index: true 
-  },
-  name: { 
-    type: String, 
-    required: true, 
-    trim: true,
-    maxlength: 100
-  },
-  position: { 
-    type: String, 
-    trim: true,
-    maxlength: 100
-  },
-  email: { 
-    type: String, 
-    lowercase: true, 
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      },
-      message: 'Invalid email format'
-    }
-  },
-  phone: { 
-    type: String, 
-    trim: true,
-    maxlength: 20
-  },
-  linkedin: { 
-    type: String, 
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return !v || /^https?:\/\/.+/.test(v);
-      },
-      message: 'LinkedIn URL must be a valid URL'
-    }
-  },
-  firm: { 
-    type: String, 
-    required: true, 
-    trim: true, 
-    index: true,
-    maxlength: 100
-  },
-  group: { 
-    type: String, 
-    trim: true,
-    maxlength: 50
-  }, // TMT, Healthcare, FIG, etc.
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+  name: { type: String, required: true, trim: true },
+  position: { type: String, trim: true },
+  email: { type: String, lowercase: true, trim: true },
+  phone: { type: String, trim: true },
+  linkedin: { type: String, trim: true },
+  firm: { type: String, required: true, trim: true, index: true },
+  group: { type: String, trim: true }, // TMT, Healthcare, FIG, etc.
   networkingStatus: { 
     type: String, 
     enum: [
@@ -114,15 +55,7 @@ const contactSchema = new mongoose.Schema({
     ],
     default: 'Not Yet Contacted'
   },
-  networkingDate: { 
-    type: String,
-    validate: {
-      validator: function(v) {
-        return !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }, // YYYY-MM-DD format to match frontend
+  networkingDate: { type: String }, // YYYY-MM-DD format to match frontend
   nextSteps: { 
     type: String,
     enum: [
@@ -136,80 +69,31 @@ const contactSchema = new mongoose.Schema({
       '', null
     ]
   },
-  nextStepsDate: { 
-    type: String,
-    validate: {
-      validator: function(v) {
-        return !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }, // YYYY-MM-DD format to match frontend
+  nextStepsDate: { type: String }, // YYYY-MM-DD format to match frontend
   referred: { type: Boolean, default: false },
-  notes: { 
-    type: String,
-    maxlength: 2000
-  },
+  notes: { type: String },
   interactions: [{
     type: {
       type: String,
       enum: ['Call', 'Email', 'Meeting', 'Note'],
       required: true
     },
-    title: { 
-      type: String, 
-      required: true,
-      maxlength: 200
-    },
-    date: { 
-      type: String, 
-      required: true,
-      validate: {
-        validator: function(v) {
-          return /^\d{4}-\d{2}-\d{2}$/.test(v);
-        },
-        message: 'Date must be in YYYY-MM-DD format'
-      }
-    }, // YYYY-MM-DD format
-    notes: { 
-      type: String, 
-      required: true,
-      maxlength: 2000
-    },
+    title: { type: String, required: true },
+    date: { type: String, required: true }, // YYYY-MM-DD format
+    notes: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
   }],
-  isArchived: { type: Boolean, default: false },
-  archivedAt: Date
+  isArchived: { type: Boolean, default: false }
 }, {
   timestamps: true
 });
 
 // Interview Schema - Matches your frontend exactly
 const interviewSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'User', 
-    index: true 
-  },
-  firm: { 
-    type: String, 
-    required: true, 
-    trim: true, 
-    index: true,
-    maxlength: 100
-  },
-  position: { 
-    type: String, 
-    required: true, 
-    trim: true,
-    maxlength: 100
-  },
-  group: { 
-    type: String, 
-    trim: true,
-    maxlength: 50
-  }, // TMT, Healthcare, FIG, etc.
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+  firm: { type: String, required: true, trim: true, index: true },
+  position: { type: String, required: true, trim: true },
+  group: { type: String, trim: true }, // TMT, Healthcare, FIG, etc.
   stage: { 
     type: String,
     enum: [
@@ -227,15 +111,7 @@ const interviewSchema = new mongoose.Schema({
     ],
     default: 'Not Yet Applied'
   },
-  stageDate: { 
-    type: String,
-    validate: {
-      validator: function(v) {
-        return !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }, // YYYY-MM-DD format to match frontend
+  stageDate: { type: String }, // YYYY-MM-DD format to match frontend
   nextSteps: { 
     type: String,
     enum: [
@@ -251,43 +127,17 @@ const interviewSchema = new mongoose.Schema({
       '', null
     ]
   },
-  nextStepsDate: { 
-    type: String,
-    validate: {
-      validator: function(v) {
-        return !v || /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }, // YYYY-MM-DD format to match frontend
-  notes: { 
-    type: String,
-    maxlength: 2000
-  },
-  referralContactId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Contact' 
-  },
+  nextStepsDate: { type: String }, // YYYY-MM-DD format to match frontend
+  notes: { type: String },
+  referralContactId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact' },
   rounds: [{
     stage: {
       type: String,
       enum: ['Phone Screen', 'First Round', 'Second Round', 'Third Round', 'Case Study', 'Superday'],
       required: true
     },
-    date: { 
-      type: String, 
-      required: true,
-      validate: {
-        validator: function(v) {
-          return /^\d{4}-\d{2}-\d{2}$/.test(v);
-        },
-        message: 'Date must be in YYYY-MM-DD format'
-      }
-    }, // YYYY-MM-DD format
-    interviewer: { 
-      type: String,
-      maxlength: 100
-    },
+    date: { type: String, required: true }, // YYYY-MM-DD format
+    interviewer: { type: String },
     format: {
       type: String,
       enum: ['Phone', 'Video', 'In-Person', 'Assessment'],
@@ -298,32 +148,18 @@ const interviewSchema = new mongoose.Schema({
       enum: ['Pending', 'Passed', 'Failed', 'Cancelled'],
       default: 'Pending'
     },
-    notes: { 
-      type: String,
-      maxlength: 2000
-    },
+    notes: { type: String },
     createdAt: { type: Date, default: Date.now }
   }],
-  isArchived: { type: Boolean, default: false },
-  archivedAt: Date
+  isArchived: { type: Boolean, default: false }
 }, {
   timestamps: true
 });
 
 // Document Schema - Matches your frontend exactly
 const documentSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'User', 
-    index: true 
-  },
-  name: { 
-    type: String, 
-    required: true, 
-    trim: true,
-    maxlength: 200
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+  name: { type: String, required: true, trim: true },
   type: {
     type: String,
     enum: [
@@ -346,49 +182,19 @@ const documentSchema = new mongoose.Schema({
   },
   associatedContacts: [String], // Array of contact names
   associatedFirms: [String], // Array of firm names
-  tags: [{
-    type: String,
-    maxlength: 50
-  }], // Custom tags for organization
-  notes: {
-    type: String,
-    maxlength: 1000
-  },
+  tags: [String], // Custom tags for organization
+  notes: String,
   isTemplate: { type: Boolean, default: false },
   isArchived: { type: Boolean, default: false },
-  archivedAt: Date,
-  uploadDate: { 
-    type: String, 
-    default: () => new Date().toISOString().split('T')[0],
-    validate: {
-      validator: function(v) {
-        return /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }
+  uploadDate: { type: String, default: () => new Date().toISOString().split('T')[0] }
 }, {
   timestamps: true
 });
 
 // Analytics Schema - Simple version for tracking
 const analyticsSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'User', 
-    index: true 
-  },
-  date: { 
-    type: String, 
-    required: true,
-    validate: {
-      validator: function(v) {
-        return /^\d{4}-\d{2}-\d{2}$/.test(v);
-      },
-      message: 'Date must be in YYYY-MM-DD format'
-    }
-  }, // YYYY-MM-DD format
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+  date: { type: String, required: true }, // YYYY-MM-DD format
   metrics: {
     contactsAdded: { type: Number, default: 0 },
     interactionsLogged: { type: Number, default: 0 },
@@ -400,38 +206,13 @@ const analyticsSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create compound indexes for better performance
+// Create indexes for better performance
 contactSchema.index({ userId: 1, firm: 1 });
 contactSchema.index({ userId: 1, networkingStatus: 1 });
-contactSchema.index({ userId: 1, nextStepsDate: 1 });
-contactSchema.index({ userId: 1, isArchived: 1 });
-
 interviewSchema.index({ userId: 1, firm: 1 });
 interviewSchema.index({ userId: 1, stage: 1 });
-interviewSchema.index({ userId: 1, nextStepsDate: 1 });
-interviewSchema.index({ userId: 1, isArchived: 1 });
-
 documentSchema.index({ userId: 1, type: 1 });
-documentSchema.index({ userId: 1, isArchived: 1 });
-
 analyticsSchema.index({ userId: 1, date: 1 }, { unique: true });
-
-// Add pre-save middleware for validation
-userSchema.pre('save', function(next) {
-  // Convert email to lowercase
-  if (this.email) {
-    this.email = this.email.toLowerCase();
-  }
-  next();
-});
-
-contactSchema.pre('save', function(next) {
-  // Convert email to lowercase
-  if (this.email) {
-    this.email = this.email.toLowerCase();
-  }
-  next();
-});
 
 // Create models
 const User = mongoose.model('User', userSchema);
