@@ -14,7 +14,7 @@ const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const formattedErrors = errors.array().map(error => ({
-      field: error.path,
+      field: error.path || error.param,
       message: error.msg,
       value: error.value
     }));
@@ -28,30 +28,73 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Rate limiting for auth endpoints
+// Rate limiting for auth endpoints - More permissive for development
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per window (increased for testing)
+  max: process.env.NODE_ENV === 'development' ? 1000 : 10, // Very high limit in dev
   message: {
     message: 'Too many authentication attempts, please try again later',
     code: 'RATE_LIMITED'
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting in development
+    return process.env.NODE_ENV === 'development';
+  }
 });
 
-// Signup route
-router.post('/signup', authLimiter, userValidation.signup, handleValidationErrors, async (req, res) => {
+// Test route to check if auth routes are working
+router.get('/test', (req, res) => {
+  res.json({
+    message: 'Auth routes are working!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Signup route with better error handling
+router.post('/signup', authLimiter, async (req, res) => {
   try {
-    console.log('Signup attempt:', { email: req.body.email });
+    console.log('🔐 Signup attempt:', { 
+      email: req.body.email,
+      hasPassword: !!req.body.password,
+      bodyKeys: Object.keys(req.body)
+    });
+
+    // Basic validation
     const { email, password, profile = {} } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.log('User already exists:', email);
+    if (!email || !password) {
       return res.status(400).json({ 
-        message: 'User already exists with this email',
+        message: 'Email and password are required',
+        code: 'MISSING_CREDENTIALS'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        message: 'Please provide a valid email address',
+        code: 'INVALID_EMAIL'
+      });
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long',
+        code: 'WEAK_PASSWORD'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      console.log('❌ User already exists:', email);
+      return res.status(400).json({ 
+        message: 'An account with this email already exists',
         code: 'USER_EXISTS'
       });
     }
@@ -62,25 +105,31 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
 
     // Create user
     const user = new User({
-      email,
+      email: email.toLowerCase(),
       passwordHash,
-      profile,
+      profile: {
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || ''
+      },
       lastLogin: new Date()
     });
 
     await user.save();
-    console.log('User created successfully:', user.email);
+    console.log('✅ User created successfully:', user.email);
 
     // Generate tokens
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-jwt-secret-for-development-only';
+    const refreshSecret = process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret-for-development-only';
+
     const accessToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key', 
+      jwtSecret, 
       { expiresIn: process.env.JWT_EXPIRE || '24h' }
     );
 
     const refreshToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret', 
+      refreshSecret, 
       { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' }
     );
 
@@ -105,29 +154,52 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
         profile: user.profile,
         role: user.role,
         createdAt: user.createdAt
-      }
+      },
+      success: true
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error('❌ Signup error:', error);
+    
+    // Handle specific mongoose errors
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'An account with this email already exists',
+        code: 'USER_EXISTS'
+      });
+    }
+    
     res.status(500).json({ 
-      message: 'Server error during signup',
-      code: 'SIGNUP_ERROR'
+      message: 'An error occurred while creating your account. Please try again.',
+      code: 'SIGNUP_ERROR',
+      ...(process.env.NODE_ENV === 'development' && { error: error.message })
     });
   }
 });
 
-// Login route
-router.post('/login', authLimiter, userValidation.login, handleValidationErrors, async (req, res) => {
+// Login route with better error handling
+router.post('/login', authLimiter, async (req, res) => {
   try {
-    console.log('Login attempt:', { email: req.body.email });
+    console.log('🔐 Login attempt:', { 
+      email: req.body.email,
+      hasPassword: !!req.body.password 
+    });
+
     const { email, password } = req.body;
 
+    // Basic validation
+    if (!email || !password) {
+      return res.status(400).json({ 
+        message: 'Email and password are required',
+        code: 'MISSING_CREDENTIALS'
+      });
+    }
+
     // Find user and include password hash for verification
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      console.log('User not found:', email);
+      console.log('❌ User not found:', email);
       return res.status(401).json({ 
-        message: 'Invalid credentials',
+        message: 'Invalid email or password',
         code: 'INVALID_CREDENTIALS'
       });
     }
@@ -135,9 +207,9 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      console.log('Invalid password for user:', email);
+      console.log('❌ Invalid password for user:', email);
       return res.status(401).json({ 
-        message: 'Invalid credentials',
+        message: 'Invalid email or password',
         code: 'INVALID_CREDENTIALS'
       });
     }
@@ -146,18 +218,21 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
     user.lastLogin = new Date();
     await user.save();
 
-    console.log('User logged in successfully:', user.email);
+    console.log('✅ User logged in successfully:', user.email);
 
     // Generate tokens
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-jwt-secret-for-development-only';
+    const refreshSecret = process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret-for-development-only';
+
     const accessToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key', 
+      jwtSecret, 
       { expiresIn: process.env.JWT_EXPIRE || '24h' }
     );
 
     const refreshToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret', 
+      refreshSecret, 
       { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' }
     );
 
@@ -186,38 +261,60 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
         profile: user.profile,
         role: user.role,
         lastLogin: user.lastLogin
-      }
+      },
+      success: true
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({ 
-      message: 'Server error during login',
-      code: 'LOGIN_ERROR'
+      message: 'An error occurred while logging in. Please try again.',
+      code: 'LOGIN_ERROR',
+      ...(process.env.NODE_ENV === 'development' && { error: error.message })
     });
   }
 });
 
 // Refresh token route
-router.post('/refresh', validateRefreshToken, async (req, res) => {
+router.post('/refresh', async (req, res) => {
   try {
-    const user = req.user;
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({
+        message: 'Refresh token required',
+        code: 'MISSING_REFRESH_TOKEN'
+      });
+    }
+
+    const refreshSecret = process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret-for-development-only';
+    const decoded = jwt.verify(refreshToken, refreshSecret);
+    const user = await User.findById(decoded.id).select('-passwordHash');
+    
+    if (!user) {
+      return res.status(401).json({
+        message: 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
 
     // Generate new access token
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-jwt-secret-for-development-only';
     const accessToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.JWT_SECRET || 'fallback-secret-key', 
+      jwtSecret, 
       { expiresIn: process.env.JWT_EXPIRE || '24h' }
     );
 
     res.json({
       message: 'Token refreshed successfully',
-      accessToken
+      accessToken,
+      success: true
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({ 
-      message: 'Server error during token refresh',
-      code: 'REFRESH_ERROR'
+    console.error('❌ Token refresh error:', error);
+    res.status(401).json({ 
+      message: 'Invalid refresh token',
+      code: 'INVALID_REFRESH_TOKEN'
     });
   }
 });
@@ -241,10 +338,11 @@ router.post('/logout', authenticateToken, async (req, res) => {
 
     res.json({ 
       message: 'Logout successful',
-      code: 'LOGOUT_SUCCESS'
+      code: 'LOGOUT_SUCCESS',
+      success: true
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error('❌ Logout error:', error);
     res.status(500).json({ 
       message: 'Server error during logout',
       code: 'LOGOUT_ERROR'
@@ -259,17 +357,11 @@ router.get('/verify', authenticateToken, (req, res) => {
     user: {
       id: req.user.id,
       email: req.user.email,
-      role: req.user.role
+      role: req.user.role,
+      profile: req.user.profile
     },
-    code: 'TOKEN_VALID'
-  });
-});
-
-// Test route to check if auth routes are working
-router.get('/test', (req, res) => {
-  res.json({
-    message: 'Auth routes are working!',
-    timestamp: new Date().toISOString()
+    code: 'TOKEN_VALID',
+    success: true
   });
 });
 
