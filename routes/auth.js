@@ -91,7 +91,6 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
     res.status(500).json({ 
       message: 'Server error during signup',
       code: 'SIGNUP_ERROR'
-      error: error.message
     });
   }
 });
