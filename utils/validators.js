@@ -5,10 +5,12 @@ const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const formattedErrors = errors.array().map(error => ({
-      field: error.path,
+      field: error.path || error.param,
       message: error.msg,
       value: error.value
     }));
+    
+    console.log('Validation errors:', formattedErrors);
     
     return res.status(400).json({ 
       message: 'Validation error', 
@@ -29,7 +31,7 @@ const userValidation = {
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters long')
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])?[A-Za-z\d@$!%*?&]/)
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
       .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
     body('profile.firstName')
       .optional()
@@ -80,7 +82,19 @@ const userValidation = {
     body('profile.linkedinUrl')
       .optional()
       .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL')
+      .withMessage('LinkedIn URL must be a valid URL'),
+    body('preferences.theme')
+      .optional()
+      .isIn(['light', 'dark', 'auto'])
+      .withMessage('Theme must be light, dark, or auto'),
+    body('preferences.notifications')
+      .optional()
+      .isBoolean()
+      .withMessage('Notifications must be true or false'),
+    body('preferences.timezone')
+      .optional()
+      .isLength({ min: 1, max: 50 })
+      .withMessage('Timezone must be between 1 and 50 characters')
   ],
   
   changePassword: [
@@ -90,7 +104,25 @@ const userValidation = {
     body('newPassword')
       .isLength({ min: 8 })
       .withMessage('New password must be at least 8 characters long')
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])?[A-Za-z\d@$!%*?&]/)
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+      .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number')
+  ],
+  
+  forgotPassword: [
+    body('email')
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('Please provide a valid email address')
+  ],
+  
+  resetPassword: [
+    body('token')
+      .notEmpty()
+      .withMessage('Reset token is required'),
+    body('newPassword')
+      .isLength({ min: 8 })
+      .withMessage('New password must be at least 8 characters long')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
       .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number')
   ]
 };
@@ -128,6 +160,11 @@ const contactValidation = {
       .optional()
       .isURL({ protocols: ['http', 'https'] })
       .withMessage('LinkedIn URL must be a valid URL'),
+    body('group')
+      .optional()
+      .trim()
+      .isLength({ max: 50 })
+      .withMessage('Group must be less than 50 characters'),
     body('networkingStatus')
       .optional()
       .isIn([
@@ -140,7 +177,15 @@ const contactValidation = {
       .optional()
       .isIn(['Analyst', 'Associate', 'VP', 'Director', 'MD', 'Other'])
       .withMessage('Invalid seniority level'),
+    body('priority')
+      .optional()
+      .isIn(['High', 'Medium', 'Low'])
+      .withMessage('Invalid priority level'),
     body('networkingDate')
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('Date must be in YYYY-MM-DD format'),
+    body('lastContactDate')
       .optional()
       .matches(/^\d{4}-\d{2}-\d{2}$/)
       .withMessage('Date must be in YYYY-MM-DD format'),
@@ -148,6 +193,18 @@ const contactValidation = {
       .optional()
       .matches(/^\d{4}-\d{2}-\d{2}$/)
       .withMessage('Date must be in YYYY-MM-DD format'),
+    body('nextSteps')
+      .optional()
+      .isIn([
+        'Send Initial Outreach', 'Schedule Intro Call', 'Prepare for Upcoming Call',
+        'Send Thank You Email', 'Send Resume', 'Send Follow-Up Email',
+        'Schedule Follow-Up Call', '', null
+      ])
+      .withMessage('Invalid next steps value'),
+    body('referred')
+      .optional()
+      .isBoolean()
+      .withMessage('Referred must be true or false'),
     body('notes')
       .optional()
       .isLength({ max: 2000 })
@@ -177,6 +234,11 @@ const contactValidation = {
       .notEmpty()
       .isLength({ min: 1, max: 100 })
       .withMessage('Firm name must be between 1 and 100 characters'),
+    body('position')
+      .optional()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage('Position must be less than 100 characters'),
     body('email')
       .optional()
       .isEmail()
@@ -189,7 +251,31 @@ const contactValidation = {
     body('linkedin')
       .optional()
       .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL')
+      .withMessage('LinkedIn URL must be a valid URL'),
+    body('networkingStatus')
+      .optional()
+      .isIn([
+        'Not Yet Contacted', 'Initial Outreach Sent', 'Intro Call Scheduled',
+        'Intro Call Complete', 'Follow-Up Email Sent', 'Follow-Up Call Scheduled',
+        'Follow-Up Call Complete', 'Regular Contact'
+      ])
+      .withMessage('Invalid networking status'),
+    body('seniority')
+      .optional()
+      .isIn(['Analyst', 'Associate', 'VP', 'Director', 'MD', 'Other'])
+      .withMessage('Invalid seniority level'),
+    body('priority')
+      .optional()
+      .isIn(['High', 'Medium', 'Low'])
+      .withMessage('Invalid priority level'),
+    body('referred')
+      .optional()
+      .isBoolean()
+      .withMessage('Referred must be true or false'),
+    body('notes')
+      .optional()
+      .isLength({ max: 2000 })
+      .withMessage('Notes must be less than 2000 characters')
   ],
   
   addInteraction: [
@@ -272,6 +358,18 @@ const interviewValidation = {
       .optional()
       .isIn(['High', 'Medium', 'Low'])
       .withMessage('Invalid priority level'),
+    body('nextSteps')
+      .optional()
+      .isIn([
+        'Submit Application', 'Follow-Up on Application', 'Prepare for Upcoming Interview',
+        'Send Thank You Email', 'Submit Additional Materials', 'Follow-Up on Status',
+        'Schedule Next Round', 'Complete Case Study', 'Negotiate Offer', '', null
+      ])
+      .withMessage('Invalid next steps value'),
+    body('nextStepsDate')
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('Date must be in YYYY-MM-DD format'),
     body('notes')
       .optional()
       .isLength({ max: 2000 })
@@ -296,6 +394,16 @@ const interviewValidation = {
       .notEmpty()
       .isLength({ min: 1, max: 100 })
       .withMessage('Position must be between 1 and 100 characters'),
+    body('group')
+      .optional()
+      .trim()
+      .isLength({ max: 50 })
+      .withMessage('Group must be less than 50 characters'),
+    body('office')
+      .optional()
+      .trim()
+      .isLength({ max: 50 })
+      .withMessage('Office must be less than 50 characters'),
     body('stage')
       .optional()
       .isIn([
@@ -303,7 +411,23 @@ const interviewValidation = {
         'Second Round', 'Third Round', 'Case Study', 'Superday',
         'Final Round', 'Offer Received', 'Rejected', 'Withdrawn'
       ])
-      .withMessage('Invalid interview stage')
+      .withMessage('Invalid interview stage'),
+    body('priority')
+      .optional()
+      .isIn(['High', 'Medium', 'Low'])
+      .withMessage('Invalid priority level'),
+    body('nextSteps')
+      .optional()
+      .isIn([
+        'Submit Application', 'Follow-Up on Application', 'Prepare for Upcoming Interview',
+        'Send Thank You Email', 'Submit Additional Materials', 'Follow-Up on Status',
+        'Schedule Next Round', 'Complete Case Study', 'Negotiate Offer', '', null
+      ])
+      .withMessage('Invalid next steps value'),
+    body('notes')
+      .optional()
+      .isLength({ max: 2000 })
+      .withMessage('Notes must be less than 2000 characters')
   ],
   
   addRound: [
@@ -391,7 +515,11 @@ const documentValidation = {
     body('notes')
       .optional()
       .isLength({ max: 1000 })
-      .withMessage('Notes must be less than 1000 characters')
+      .withMessage('Notes must be less than 1000 characters'),
+    body('isTemplate')
+      .optional()
+      .isBoolean()
+      .withMessage('isTemplate must be true or false')
   ],
   
   update: [
@@ -410,10 +538,23 @@ const documentValidation = {
         'Case Study', 'Presentation', 'Research', 'Other'
       ])
       .withMessage('Invalid document type'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage('Description must be less than 500 characters'),
     body('content')
       .optional()
       .isLength({ max: 50000 })
-      .withMessage('Content must be less than 50,000 characters')
+      .withMessage('Content must be less than 50,000 characters'),
+    body('notes')
+      .optional()
+      .isLength({ max: 1000 })
+      .withMessage('Notes must be less than 1000 characters'),
+    body('isTemplate')
+      .optional()
+      .isBoolean()
+      .withMessage('isTemplate must be true or false')
   ]
 };
 
@@ -426,9 +567,18 @@ const taskValidation = {
       .withMessage('Task title is required')
       .isLength({ min: 1, max: 200 })
       .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
     body('type')
       .isIn(['Contact', 'Interview', 'Application', 'Follow-up', 'Research', 'Other'])
       .withMessage('Invalid task type'),
+    body('status')
+      .optional()
+      .isIn(['Pending', 'In Progress', 'Completed', 'Cancelled'])
+      .withMessage('Invalid task status'),
     body('priority')
       .optional()
       .isIn(['High', 'Medium', 'Low'])
@@ -445,10 +595,6 @@ const taskValidation = {
       .optional()
       .isInt({ min: 5, max: 600 })
       .withMessage('Estimated duration must be between 5 and 600 minutes'),
-    body('description')
-      .optional()
-      .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters'),
     body('relatedContact')
       .optional()
       .isMongoId()
@@ -456,7 +602,19 @@ const taskValidation = {
     body('relatedInterview')
       .optional()
       .isMongoId()
-      .withMessage('Invalid interview ID')
+      .withMessage('Invalid interview ID'),
+    body('relatedDocument')
+      .optional()
+      .isMongoId()
+      .withMessage('Invalid document ID'),
+    body('tags')
+      .optional()
+      .isArray()
+      .withMessage('Tags must be an array'),
+    body('notes')
+      .optional()
+      .isLength({ max: 1000 })
+      .withMessage('Notes must be less than 1000 characters')
   ],
   
   update: [
@@ -467,6 +625,11 @@ const taskValidation = {
       .notEmpty()
       .isLength({ min: 1, max: 200 })
       .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
     body('status')
       .optional()
       .isIn(['Pending', 'In Progress', 'Completed', 'Cancelled'])
@@ -478,7 +641,15 @@ const taskValidation = {
     body('actualDuration')
       .optional()
       .isInt({ min: 1, max: 600 })
-      .withMessage('Actual duration must be between 1 and 600 minutes')
+      .withMessage('Actual duration must be between 1 and 600 minutes'),
+    body('completedAt')
+      .optional()
+      .isISO8601()
+      .withMessage('Completed date must be a valid ISO 8601 date'),
+    body('notes')
+      .optional()
+      .isLength({ max: 1000 })
+      .withMessage('Notes must be less than 1000 characters')
   ]
 };
 
@@ -491,6 +662,11 @@ const goalValidation = {
       .withMessage('Goal title is required')
       .isLength({ min: 1, max: 200 })
       .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
     body('category')
       .isIn(['Networking', 'Applications', 'Interviews', 'Learning', 'Personal'])
       .withMessage('Invalid goal category'),
@@ -507,6 +683,15 @@ const goalValidation = {
         }
         return true;
       }),
+    body('current')
+      .optional()
+      .isNumeric()
+      .withMessage('Current value must be a number'),
+    body('unit')
+      .optional()
+      .trim()
+      .isLength({ max: 20 })
+      .withMessage('Unit must be less than 20 characters'),
     body('timeframe')
       .isIn(['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly', 'Custom'])
       .withMessage('Invalid timeframe'),
@@ -522,10 +707,37 @@ const goalValidation = {
         }
         return true;
       }),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
+      .withMessage('Invalid goal status')
+  ],
+  
+  update: [
+    param('id').isMongoId().withMessage('Invalid goal ID'),
+    body('title')
+      .optional()
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 200 })
+      .withMessage('Title must be between 1 and 200 characters'),
     body('description')
       .optional()
+      .trim()
       .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters')
+      .withMessage('Description must be less than 1000 characters'),
+    body('target')
+      .optional()
+      .isNumeric()
+      .withMessage('Target must be a number'),
+    body('current')
+      .optional()
+      .isNumeric()
+      .withMessage('Current value must be a number'),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
+      .withMessage('Invalid goal status')
   ]
 };
 
@@ -563,6 +775,85 @@ const dateRangeValidation = [
       return true;
     })
 ];
+
+// Bulk operations validation
+const bulkValidation = {
+  bulkUpdate: [
+    body('operation')
+      .isIn(['archive', 'restore', 'update', 'delete'])
+      .withMessage('Invalid bulk operation'),
+    body('contactIds')
+      .isArray({ min: 1 })
+      .withMessage('Contact IDs array is required and must not be empty'),
+    body('contactIds.*')
+      .isMongoId()
+      .withMessage('Each contact ID must be a valid MongoDB ID'),
+    body('updateData')
+      .if(body('operation').equals('update'))
+      .notEmpty()
+      .withMessage('Update data is required for update operation')
+  ],
+  
+  bulkImport: [
+    body('contacts')
+      .isArray({ min: 1 })
+      .withMessage('Contacts array is required and must not be empty'),
+    body('skipDuplicates')
+      .optional()
+      .isBoolean()
+      .withMessage('Skip duplicates must be true or false')
+  ]
+};
+
+// Analytics validation
+const analyticsValidation = {
+  track: [
+    body('action')
+      .isIn([
+        'contact_added', 'interaction_logged', 'interview_scheduled', 
+        'follow_up_completed', 'document_created', 'task_completed', 'goal_updated'
+      ])
+      .withMessage('Invalid analytics action'),
+    body('date')
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('Date must be in YYYY-MM-DD format')
+  ]
+};
+
+// Search validation
+const searchValidation = {
+  global: [
+    query('q')
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Search query must be between 2 and 100 characters')
+      .escape(),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 50 })
+      .withMessage('Limit must be between 1 and 50')
+  ]
+};
+
+// File upload validation
+const fileValidation = {
+  upload: [
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 1, max: 255 })
+      .withMessage('File name must be between 1 and 255 characters'),
+    body('type')
+      .optional()
+      .isIn(['pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'gif'])
+      .withMessage('Invalid file type'),
+    body('size')
+      .optional()
+      .isInt({ min: 1, max: 10485760 }) // 10MB max
+      .withMessage('File size must be between 1 byte and 10MB')
+  ]
+};
 
 // Custom validators
 const customValidators = {
@@ -664,6 +955,28 @@ const customValidators = {
     }
     
     return true;
+  },
+  
+  // Validate email domain
+  isValidEmailDomain: (allowedDomains) => (value) => {
+    if (!value) return true;
+    
+    const domain = value.split('@')[1];
+    if (allowedDomains && !allowedDomains.includes(domain)) {
+      throw new Error(`Email domain must be one of: ${allowedDomains.join(', ')}`);
+    }
+    return true;
+  },
+  
+  // Validate unique array values
+  hasUniqueValues: (value) => {
+    if (!Array.isArray(value)) return true;
+    
+    const uniqueValues = [...new Set(value)];
+    if (uniqueValues.length !== value.length) {
+      throw new Error('Array values must be unique');
+    }
+    return true;
   }
 };
 
@@ -671,6 +984,7 @@ const customValidators = {
 const sanitizers = {
   // Remove HTML tags and encode special characters
   sanitizeText: (value) => {
+    if (!value) return value;
     return value
       .replace(/<[^>]*>/g, '') // Remove HTML tags
       .replace(/[<>&"']/g, (char) => { // Encode special characters
@@ -688,6 +1002,7 @@ const sanitizers = {
   
   // Normalize and validate email
   normalizeEmail: (value) => {
+    if (!value) return value;
     return value.toLowerCase().trim();
   },
   
@@ -723,6 +1038,103 @@ const sanitizers = {
     } catch {
       return value; // Return original if invalid
     }
+  },
+  
+  // Sanitize tags array
+  sanitizeTags: (tags) => {
+    if (!Array.isArray(tags)) return [];
+    
+    return tags
+      .map(tag => sanitizers.sanitizeText(tag))
+      .filter(tag => tag && tag.length > 0)
+      .slice(0, 20); // Limit to 20 tags
+  },
+  
+  // Clean and validate date string
+  normalizeDate: (value) => {
+    if (!value) return value;
+    
+    try {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return null;
+      
+      // Return in YYYY-MM-DD format
+      return date.toISOString().split('T')[0];
+    } catch {
+      return null;
+    }
+  }
+};
+
+// Validation middleware compositions
+const validationMiddleware = {
+  // Standard CRUD operations
+  standardCreate: (entityValidation) => [
+    ...entityValidation.create,
+    handleValidationErrors
+  ],
+  
+  standardUpdate: (entityValidation) => [
+    ...entityValidation.update,
+    handleValidationErrors
+  ],
+  
+  standardDelete: [
+    param('id').isMongoId().withMessage('Invalid ID'),
+    handleValidationErrors
+  ],
+  
+  // Pagination with search
+  paginatedList: [
+    ...paginationValidation,
+    handleValidationErrors
+  ],
+  
+  // Date range queries
+  dateRangeQuery: [
+    ...dateRangeValidation,
+    handleValidationErrors
+  ],
+  
+  // File upload
+  fileUpload: [
+    ...fileValidation.upload,
+    handleValidationErrors
+  ]
+};
+
+// Error response helpers
+const validationHelpers = {
+  // Create custom validation error
+  createValidationError: (field, message, value = null) => {
+    return {
+      field,
+      message,
+      value,
+      location: 'body'
+    };
+  },
+  
+  // Format validation errors for client
+  formatErrors: (errors) => {
+    return errors.map(error => ({
+      field: error.param || error.path,
+      message: error.msg,
+      value: error.value,
+      location: error.location
+    }));
+  },
+  
+  // Check if request has validation errors
+  hasValidationErrors: (req) => {
+    const errors = validationResult(req);
+    return !errors.isEmpty();
+  },
+  
+  // Get validation errors from request
+  getValidationErrors: (req) => {
+    const errors = validationResult(req);
+    return errors.array();
   }
 };
 
@@ -736,6 +1148,12 @@ module.exports = {
   goalValidation,
   paginationValidation,
   dateRangeValidation,
+  bulkValidation,
+  analyticsValidation,
+  searchValidation,
+  fileValidation,
   customValidators,
-  sanitizers
+  sanitizers,
+  validationMiddleware,
+  validationHelpers
 };
