@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models');
+const { User } = require('../models');
 
 // Enhanced authentication middleware with better error handling
 const authenticateToken = async (req, res, next) => {
@@ -15,7 +15,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-passwordHash');
+    const user = await User.findById(decoded.id).select('-passwordHash -refreshTokens');
     
     if (!user) {
       return res.status(401).json({ 
@@ -35,6 +35,8 @@ const authenticateToken = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Authentication error:', error);
+    
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ 
         message: 'Token expired',
@@ -74,8 +76,10 @@ const optionalAuth = async (req, res, next) => {
     
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select('-passwordHash');
-      req.user = user;
+      const user = await User.findById(decoded.id).select('-passwordHash -refreshTokens');
+      if (user && user.status === 'active') {
+        req.user = user;
+      }
     }
     
     next();
@@ -119,9 +123,18 @@ const validateRefreshToken = async (req, res, next) => {
       });
     }
 
+    // Check if refresh token exists in user's stored tokens
+    if (!user.refreshTokens || !user.refreshTokens.includes(refreshToken)) {
+      return res.status(401).json({
+        message: 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
+
     req.user = user;
     next();
   } catch (error) {
+    console.error('Refresh token validation error:', error);
     return res.status(401).json({
       message: 'Invalid refresh token',
       code: 'INVALID_REFRESH_TOKEN'
