@@ -25,9 +25,12 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
   try {
     const { email, password, profile = {} } = req.body;
 
+    console.log('Signup attempt for:', email);
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('User already exists:', email);
       return res.status(400).json({ 
         message: 'User already exists with this email',
         code: 'USER_EXISTS'
@@ -44,10 +47,12 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
       passwordHash,
       profile,
       lastLogin: new Date(),
-      emailVerified: false // In production, require email verification
+      emailVerified: false,
+      status: 'active'
     });
 
     await user.save();
+    console.log('User created successfully:', email);
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -58,7 +63,7 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
 
     const refreshToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.REFRESH_TOKEN_SECRET, 
+      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET, 
       { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' }
     );
 
@@ -90,7 +95,8 @@ router.post('/signup', authLimiter, userValidation.signup, handleValidationError
     console.error('Signup error:', error);
     res.status(500).json({ 
       message: 'Server error during signup',
-      code: 'SIGNUP_ERROR'
+      code: 'SIGNUP_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -100,28 +106,49 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
   try {
     const { email, password } = req.body;
 
+    console.log('Login attempt for:', email);
+
     // Find user and include password hash for verification
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(401).json({ 
         message: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS'
       });
     }
 
+    console.log('User found:', email, 'Status:', user.status);
+
     // Check if account is locked
     if (user.isLocked) {
+      console.log('Account locked:', email);
       return res.status(423).json({
         message: 'Account temporarily locked due to too many failed login attempts',
         code: 'ACCOUNT_LOCKED'
       });
     }
 
+    // Check if account is active
+    if (user.status !== 'active') {
+      console.log('Account not active:', email, 'Status:', user.status);
+      return res.status(401).json({
+        message: 'Account is not active',
+        code: 'ACCOUNT_INACTIVE'
+      });
+    }
+
+    console.log('Verifying password for:', email);
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      console.log('Invalid password for:', email);
+      
       // Increment login attempts
-      await user.incLoginAttempts();
+      if (user.incLoginAttempts) {
+        await user.incLoginAttempts();
+      }
       
       return res.status(401).json({ 
         message: 'Invalid credentials',
@@ -129,14 +156,18 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
       });
     }
 
+    console.log('Password valid for:', email);
+
     // Reset login attempts on successful login
-    if (user.loginAttempts > 0) {
+    if (user.loginAttempts > 0 && user.resetLoginAttempts) {
       await user.resetLoginAttempts();
     }
 
     // Update last login
     user.lastLogin = new Date();
     await user.save();
+
+    console.log('Generating tokens for:', email);
 
     // Generate tokens
     const accessToken = jwt.sign(
@@ -147,7 +178,7 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
 
     const refreshToken = jwt.sign(
       { id: user._id, email: user.email }, 
-      process.env.REFRESH_TOKEN_SECRET, 
+      process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET, 
       { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' }
     );
 
@@ -167,6 +198,8 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    console.log('Login successful for:', email);
+
     res.json({
       message: 'Login successful',
       accessToken,
@@ -183,7 +216,8 @@ router.post('/login', authLimiter, userValidation.login, handleValidationErrors,
     console.error('Login error:', error);
     res.status(500).json({ 
       message: 'Server error during login',
-      code: 'LOGIN_ERROR'
+      code: 'LOGIN_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -346,6 +380,7 @@ router.post('/forgot-password', authLimiter, userValidation.login, handleValidat
 
       // TODO: Send email with reset link
       // await sendPasswordResetEmail(user.email, resetToken);
+      console.log('Password reset token generated for:', email, 'Token:', resetToken);
     }
   } catch (error) {
     console.error('Forgot password error:', error);
