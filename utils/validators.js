@@ -1200,36 +1200,4 @@ module.exports = {
   sanitizers,
   validationMiddleware,
   validationHelpers
-};('Invalid goal status')
-  ,
-  
-  update: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid goal ID');
-      }
-      return true;
-    }),
-    body('title')
-      .optional()
-      .trim()
-      .notEmpty()
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('description')
-      .optional()
-      .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters'),
-    body('target')
-      .optional()
-      .isNumeric()
-      .withMessage('Target must be a number'),
-    body('current')
-      .optional()
-      .isNumeric()
-      .withMessage('Current value must be a number'),
-    body('status')
-      .optional()
-      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
-      .withMessage
+};
