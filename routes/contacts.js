@@ -208,80 +208,11 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
       userId: req.user.id,
       name: { 
         $regex: new RegExp(
-      `^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-      'i'
-    )
-  },
-  firm: cleanedData.firm
-});
-const express = require('express');
-const { Contact } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
-const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
-
-const router = express.Router();
-
-// Apply authentication to all routes
-router.use(authenticateToken);
-
-// Get all contacts with filtering, search, and pagination
-router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 50, 
-      search, 
-      networkingStatus, 
-      firm, 
-      group, 
-      priority,
-      referred,
-      tags,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Build query
-    const query = { userId: req.user.id, isArchived: { $ne: true } };
-    
-    // Search functionality
-   if (search) {
-  const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  query.name = { $regex: escapedSearch, $options: 'i' };
-}
-      
-const { Contact } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
-const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
-
-const router = express.Router();
-
-// Apply authentication to all routes
-router.use(authenticateToken);
-
-// Get all contacts with filtering, search, and pagination
-router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 50, 
-      search, 
-      networkingStatus, 
-      firm, 
-      group, 
-      priority,
-      referred,
-      tags,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Build query
-    const query = { userId: req.user.id, isArchived: { $ne: true } };
-    
-    // Search functionality
-    if (search) {
-      const searchReg')}, 'i') },
+          `^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+          'i'
+        )
+      },
+      firm: cleanedData.firm,
       isArchived: { $ne: true }
     });
 
@@ -867,72 +798,8 @@ router.post('/import', async (req, res) => {
         if (skipDuplicates) {
           const existing = await Contact.findOne({
             userId,
-            name: { $regex: new RegExp(`^${contactData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
-const { Contact } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
-const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
-
-const router = express.Router();
-
-// Apply authentication to all routes
-router.use(authenticateToken);
-
-// Get all contacts with filtering, search, and pagination
-router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 50, 
-      search, 
-      networkingStatus, 
-      firm, 
-      group, 
-      priority,
-      referred,
-      tags,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Build query
-    const query = { userId: req.user.id, isArchived: { $ne: true } };
-    
-    // Search functionality
-    if (search) {
-      const searchReg')}, 'i') },
-            firm: { $regex: new RegExp(`^${contactData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
-const { Contact } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
-const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
-
-const router = express.Router();
-
-// Apply authentication to all routes
-router.use(authenticateToken);
-
-// Get all contacts with filtering, search, and pagination
-router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 50, 
-      search, 
-      networkingStatus, 
-      firm, 
-      group, 
-      priority,
-      referred,
-      tags,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Build query
-    const query = { userId: req.user.id, isArchived: { $ne: true } };
-    
-    // Search functionality
-    if (search) {
-      const searchReg')}, 'i') },
+            name: { $regex: new RegExp(`^${contactData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') },
+            firm: { $regex: new RegExp(`^${contactData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') },
             isArchived: { $ne: true }
           });
 
