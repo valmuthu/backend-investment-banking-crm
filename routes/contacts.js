@@ -181,8 +181,25 @@ router.get('/stats', async (req, res) => {
 // Create new contact
 router.post('/', contactValidation.create, handleValidationErrors, async (req, res) => {
   try {
-    const contactData = { 
-      ...req.body, 
+    // Clean and sanitize input data
+    const cleanedData = {
+      name: req.body.name?.trim(),
+      firm: req.body.firm?.trim(),
+      position: req.body.position?.trim() || '',
+      group: req.body.group?.trim() || '',
+      email: req.body.email?.trim().toLowerCase() || '',
+      phone: req.body.phone?.trim() || '',
+      linkedin: req.body.linkedin?.trim() || '',
+      networkingStatus: req.body.networkingStatus || 'Not Yet Contacted',
+      seniority: req.body.seniority || '',
+      priority: req.body.priority || 'Medium',
+      networkingDate: req.body.networkingDate || null,
+      lastContactDate: req.body.lastContactDate || null,
+      nextStepsDate: req.body.nextStepsDate || null,
+      nextSteps: req.body.nextSteps || '',
+      referred: Boolean(req.body.referred),
+      notes: req.body.notes?.trim() || '',
+      tags: Array.isArray(req.body.tags) ? req.body.tags.filter(tag => tag?.trim()) : [],
       userId: req.user.id,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -191,8 +208,8 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
     // Check for duplicate contacts (same name and firm)
     const existingContact = await Contact.findOne({
       userId: req.user.id,
-      name: { $regex: new RegExp(`^${req.body.name}$`, 'i') },
-      firm: { $regex: new RegExp(`^${req.body.firm}$`, 'i') },
+      name: { $regex: new RegExp(`^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      firm: { $regex: new RegExp(`^${cleanedData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       isArchived: { $ne: true }
     });
 
@@ -208,7 +225,7 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
       });
     }
 
-    const contact = new Contact(contactData);
+    const contact = new Contact(cleanedData);
     await contact.save();
     
     res.status(201).json({ 
@@ -217,15 +234,33 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
     });
   } catch (error) {
     console.error('Contact creation error:', error);
+    
+    // Handle specific error types
     if (error.code === 11000) {
       return res.status(409).json({
         message: 'A contact with this information already exists',
         code: 'DUPLICATE_CONTACT'
       });
     }
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message,
+        value: err.value
+      }));
+      
+      return res.status(400).json({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        errors: validationErrors
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Error creating contact',
-      code: 'CONTACT_CREATE_ERROR'
+      code: 'CONTACT_CREATE_ERROR',
+      details: error.message
     });
   }
 });
@@ -264,9 +299,35 @@ router.get('/:id', async (req, res) => {
 // Update contact
 router.put('/:id', contactValidation.update, handleValidationErrors, async (req, res) => {
   try {
+    // Clean and sanitize input data
+    const updateData = {};
+    
+    // Only include fields that are actually being updated
+    const allowedFields = [
+      'name', 'firm', 'position', 'group', 'email', 'phone', 'linkedin',
+      'networkingStatus', 'seniority', 'priority', 'networkingDate',
+      'lastContactDate', 'nextStepsDate', 'nextSteps', 'referred', 'notes', 'tags'
+    ];
+    
+    allowedFields.forEach(field => {
+      if (req.body.hasOwnProperty(field)) {
+        if (field === 'tags') {
+          updateData[field] = Array.isArray(req.body[field]) ? req.body[field].filter(tag => tag?.trim()) : [];
+        } else if (field === 'referred') {
+          updateData[field] = Boolean(req.body[field]);
+        } else if (typeof req.body[field] === 'string') {
+          updateData[field] = req.body[field].trim();
+        } else {
+          updateData[field] = req.body[field];
+        }
+      }
+    });
+    
+    updateData.updatedAt = new Date();
+
     const contact = await Contact.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { ...req.body, updatedAt: new Date() },
+      updateData,
       { new: true, runValidators: true }
     );
     
@@ -283,15 +344,32 @@ router.put('/:id', contactValidation.update, handleValidationErrors, async (req,
     });
   } catch (error) {
     console.error('Contact update error:', error);
+    
     if (error.name === 'CastError') {
       return res.status(400).json({
         message: 'Invalid contact ID format',
         code: 'INVALID_CONTACT_ID'
       });
     }
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message,
+        value: err.value
+      }));
+      
+      return res.status(400).json({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        errors: validationErrors
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Error updating contact',
-      code: 'CONTACT_UPDATE_ERROR'
+      code: 'CONTACT_UPDATE_ERROR',
+      details: error.message
     });
   }
 });
@@ -376,7 +454,13 @@ router.post('/:id/interactions', contactValidation.addInteraction, handleValidat
     }
     
     const interaction = {
-      ...req.body,
+      type: req.body.type,
+      title: req.body.title?.trim(),
+      date: req.body.date,
+      time: req.body.time || '',
+      duration: req.body.duration || null,
+      notes: req.body.notes?.trim(),
+      sentiment: req.body.sentiment || 'Neutral',
       createdAt: new Date()
     };
     
@@ -426,7 +510,18 @@ router.put('/:contactId/interactions/:interactionId', async (req, res) => {
       });
     }
     
-    Object.assign(interaction, req.body);
+    // Update only provided fields
+    const allowedFields = ['type', 'title', 'date', 'time', 'duration', 'notes', 'sentiment'];
+    allowedFields.forEach(field => {
+      if (req.body.hasOwnProperty(field)) {
+        if (typeof req.body[field] === 'string') {
+          interaction[field] = req.body[field].trim();
+        } else {
+          interaction[field] = req.body[field];
+        }
+      }
+    });
+    
     contact.updatedAt = new Date();
     await contact.save();
     
@@ -622,8 +717,8 @@ router.post('/import', async (req, res) => {
         if (skipDuplicates) {
           const existing = await Contact.findOne({
             userId,
-            name: { $regex: new RegExp(`^${contactData.name}$`, 'i') },
-            firm: { $regex: new RegExp(`^${contactData.firm}$`, 'i') },
+            name: { $regex: new RegExp(`^${contactData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            firm: { $regex: new RegExp(`^${contactData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
             isArchived: { $ne: true }
           });
 
@@ -633,14 +728,27 @@ router.post('/import', async (req, res) => {
           }
         }
 
-        // Create contact
-        const contact = new Contact({
-          ...contactData,
+        // Create contact with cleaned data
+        const cleanedContactData = {
+          name: contactData.name?.trim(),
+          firm: contactData.firm?.trim(),
+          position: contactData.position?.trim() || '',
+          group: contactData.group?.trim() || '',
+          email: contactData.email?.trim().toLowerCase() || '',
+          phone: contactData.phone?.trim() || '',
+          linkedin: contactData.linkedin?.trim() || '',
+          networkingStatus: contactData.networkingStatus || 'Not Yet Contacted',
+          seniority: contactData.seniority || '',
+          priority: contactData.priority || 'Medium',
+          referred: Boolean(contactData.referred),
+          notes: contactData.notes?.trim() || '',
+          tags: Array.isArray(contactData.tags) ? contactData.tags.filter(tag => tag?.trim()) : [],
           userId,
           createdAt: new Date(),
           updatedAt: new Date()
-        });
+        };
 
+        const contact = new Contact(cleanedContactData);
         await contact.save();
         results.imported++;
       } catch (error) {
