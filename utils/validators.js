@@ -1201,7 +1201,7 @@ module.exports = {
   validationMiddleware,
   validationHelpers
 };('Invalid goal status')
-  ],
+  ,
   
   update: [
     param('id').custom((value) => {
