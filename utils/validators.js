@@ -278,10 +278,6 @@ const contactValidation = {
         'Follow-Up Call Complete', 'Regular Contact'
       ])
       .withMessage('Invalid networking status'),
-    body('seniority')
-      .optional({ nullable: true, checkFalsy: true })
-      .isIn(['Analyst', 'Associate', 'VP', 'Director', 'MD', 'Other'])
-      .withMessage('Invalid seniority level'),
     body('priority')
       .optional()
       .isIn(['High', 'Medium', 'Low'])
