@@ -1,4 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 
 // Enhanced validation with better error messages
 const handleValidationErrors = (req, res, next) => {
@@ -19,6 +20,14 @@ const handleValidationErrors = (req, res, next) => {
     });
   }
   next();
+};
+
+// Custom MongoDB ObjectId validator
+const isValidObjectId = (value) => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    throw new Error('Invalid ID format');
+  }
+  return true;
 };
 
 // User validation
@@ -226,12 +235,8 @@ const contactValidation = {
   
   update: [
     param('id')
-      .custom((value) => {
-        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Invalid contact ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId)
+      .withMessage('Invalid contact ID format'),
     body('name')
       .optional()
       .trim()
@@ -294,12 +299,8 @@ const contactValidation = {
   
   addInteraction: [
     param('id')
-      .custom((value) => {
-        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Invalid contact ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId)
+      .withMessage('Invalid contact ID format'),
     body('type')
       .isIn(['Call', 'Email', 'Meeting', 'Note', 'Coffee Chat', 'Event'])
       .withMessage('Invalid interaction type'),
@@ -397,7 +398,7 @@ const interviewValidation = {
     body('referralContactId')
       .optional()
       .custom((value) => {
-        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+        if (value && !mongoose.Types.ObjectId.isValid(value)) {
           throw new Error('Invalid referral contact ID');
         }
         return true;
@@ -405,12 +406,7 @@ const interviewValidation = {
   ],
   
   update: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid interview ID');
-      }
-      return true;
-    }),
+    param('id').custom(isValidObjectId),
     body('firm')
       .optional()
       .trim()
@@ -460,12 +456,7 @@ const interviewValidation = {
   ],
   
   addRound: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid interview ID');
-      }
-      return true;
-    }),
+    param('id').custom(isValidObjectId),
     body('stage')
       .isIn(['Phone Screen', 'First Round', 'Second Round', 'Third Round', 'Case Study', 'Superday', 'Final Round'])
       .withMessage('Invalid interview round stage'),
@@ -557,12 +548,7 @@ const documentValidation = {
   ],
   
   update: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid document ID');
-      }
-      return true;
-    }),
+    param('id').custom(isValidObjectId),
     body('name')
       .optional()
       .trim()
@@ -636,28 +622,13 @@ const taskValidation = {
       .withMessage('Estimated duration must be between 5 and 600 minutes'),
     body('relatedContact')
       .optional()
-      .custom((value) => {
-        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Invalid contact ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId),
     body('relatedInterview')
       .optional()
-      .custom((value) => {
-        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Invalid interview ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId),
     body('relatedDocument')
       .optional()
-      .custom((value) => {
-        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Invalid document ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId),
     body('tags')
       .optional()
       .isArray()
@@ -669,12 +640,7 @@ const taskValidation = {
   ],
   
   update: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid task ID');
-      }
-      return true;
-    }),
+    param('id').custom(isValidObjectId),
     body('title')
       .optional()
       .trim()
@@ -814,12 +780,7 @@ const bulkValidation = {
       .isArray({ min: 1 })
       .withMessage('Contact IDs array is required and must not be empty'),
     body('contactIds.*')
-      .custom((value) => {
-        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-          throw new Error('Each contact ID must be a valid MongoDB ID');
-        }
-        return true;
-      }),
+      .custom(isValidObjectId),
     body('updateData')
       .if(body('operation').equals('update'))
       .notEmpty()
@@ -890,7 +851,7 @@ const fileValidation = {
 const customValidators = {
   // Validate MongoDB ObjectId
   isValidObjectId: (value) => {
-    if (!value.match(/^[0-9a-fA-F]{24}$/)) {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
       throw new Error('Invalid ID format');
     }
     return true;
@@ -1111,12 +1072,7 @@ const validationMiddleware = {
   ],
   
   standardDelete: [
-    param('id').custom((value) => {
-      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
-        throw new Error('Invalid ID');
-      }
-      return true;
-    }),
+    param('id').custom(isValidObjectId),
     handleValidationErrors
   ],
   
@@ -1191,5 +1147,6 @@ module.exports = {
   customValidators,
   sanitizers,
   validationMiddleware,
-  validationHelpers
+  validationHelpers,
+  isValidObjectId
 };
