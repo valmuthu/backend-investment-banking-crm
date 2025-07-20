@@ -360,7 +360,7 @@ const interviewValidation = {
       .isIn([
         'Not Yet Applied', 'Applied', 'Phone Screen', 'First Round',
         'Second Round', 'Third Round', 'Case Study', 'Superday',
-        'Final Round', 'Offer Received', 'Rejected', 'Withdrawn'
+        'Final Round', 'Offer Received', 'Rejected', 'Withdrawn', '', null
       ])
       .withMessage('Invalid interview stage'),
     body('stageDate')
