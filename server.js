@@ -332,7 +332,7 @@ app.use((error, req, res, next) => {
 const gracefulShutdown = (signal) => {
   console.log(`\n🛑 ${signal} received, initiating graceful shutdown...`);
   
-  server.close((err) => {
+  server.close(async (err) => {
     if (err) {
       console.error('❌ Error during server shutdown:', err);
       process.exit(1);
