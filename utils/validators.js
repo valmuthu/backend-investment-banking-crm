@@ -7,7 +7,8 @@ const handleValidationErrors = (req, res, next) => {
     const formattedErrors = errors.array().map(error => ({
       field: error.path || error.param,
       message: error.msg,
-      value: error.value
+      value: error.value,
+      location: error.location
     }));
     
     console.log('Validation errors:', formattedErrors);
@@ -127,7 +128,7 @@ const userValidation = {
   ]
 };
 
-// Contact validation
+// Contact validation - Updated with better error handling
 const contactValidation = {
   create: [
     body('name')
@@ -135,7 +136,13 @@ const contactValidation = {
       .notEmpty()
       .withMessage('Contact name is required')
       .isLength({ min: 1, max: 100 })
-      .withMessage('Name must be between 1 and 100 characters'),
+      .withMessage('Name must be between 1 and 100 characters')
+      .custom((value) => {
+        if (!/^[a-zA-Z\s\-\.,']+$/.test(value)) {
+          throw new Error('Name can only contain letters, spaces, hyphens, periods, commas, and apostrophes');
+        }
+        return true;
+      }),
     body('firm')
       .trim()
       .notEmpty()
@@ -149,17 +156,41 @@ const contactValidation = {
       .withMessage('Position must be less than 100 characters'),
     body('email')
       .optional()
-      .isEmail()
-      .normalizeEmail()
-      .withMessage('Please provide a valid email address'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            throw new Error('Please provide a valid email address');
+          }
+        }
+        return true;
+      })
+      .normalizeEmail(),
     body('phone')
       .optional()
-      .matches(/^[\+]?[(]?[\d\s\-\(\)]{10,}$/)
-      .withMessage('Please provide a valid phone number'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          const phoneRegex = /^[\+]?[(]?[\d\s\-\(\)]{10,}$/;
+          if (!phoneRegex.test(value)) {
+            throw new Error('Please provide a valid phone number');
+          }
+        }
+        return true;
+      }),
     body('linkedin')
       .optional()
-      .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          try {
+            new URL(value);
+            if (!value.includes('linkedin.com')) {
+              throw new Error('LinkedIn URL must be from linkedin.com');
+            }
+          } catch {
+            throw new Error('LinkedIn URL must be a valid URL');
+          }
+        }
+        return true;
+      }),
     body('group')
       .optional()
       .trim()
@@ -183,16 +214,37 @@ const contactValidation = {
       .withMessage('Invalid priority level'),
     body('networkingDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
     body('lastContactDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
     body('nextStepsDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
     body('nextSteps')
       .optional()
       .isIn([
@@ -203,31 +255,493 @@ const contactValidation = {
       .withMessage('Invalid next steps value'),
     body('referred')
       .optional()
-      .isBoolean()
-      .withMessage('Referred must be true or false'),
+      .custom((value) => {
+        if (value !== undefined && typeof value !== 'boolean' && value !== 'true' && value !== 'false') {
+          throw new Error('Referred must be true or false');
+        }
+        return true;
+      }),
     body('notes')
       .optional()
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters'),
     body('tags')
       .optional()
-      .isArray()
-      .withMessage('Tags must be an array'),
-    body('tags.*')
-      .optional()
-      .trim()
-      .isLength({ min: 1, max: 50 })
-      .withMessage('Each tag must be between 1 and 50 characters')
+      .custom((value) => {
+        if (value !== undefined && !Array.isArray(value)) {
+          throw new Error('Tags must be an array');
+        }
+        if (Array.isArray(value)) {
+          for (const tag of value) {
+            if (typeof tag !== 'string' || tag.trim().length === 0 || tag.trim().length > 50) {
+              throw new Error('Each tag must be a string between 1 and 50 characters');
+            }
+          }
+        }
+        return true;
+      })
   ],
   
   update: [
-    param('id').isMongoId().withMessage('Invalid contact ID'),
+    param('id').isMongoId().withMessage('Invalid goal ID'),
+    body('title')
+      .optional()
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 200 })
+      .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
+    body('target')
+      .optional()
+      .isNumeric()
+      .withMessage('Target must be a number'),
+    body('current')
+      .optional()
+      .isNumeric()
+      .withMessage('Current value must be a number'),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
+      .withMessage('Invalid goal status')
+  ]
+};
+
+};
+
+// Query parameter validation
+const paginationValidation = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('search')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Search query must be between 1 and 100 characters')
+    .escape()
+];
+
+const dateRangeValidation = [
+  query('startDate')
+    .optional()
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Start date must be in YYYY-MM-DD format'),
+  query('endDate')
+    .optional()
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('End date must be in YYYY-MM-DD format')
+    .custom((value, { req }) => {
+      if (req.query.startDate && new Date(value) <= new Date(req.query.startDate)) {
+        throw new Error('End date must be after start date');
+      }
+      return true;
+    })
+];
+
+// Bulk operations validation
+const bulkValidation = {
+  bulkUpdate: [
+    body('operation')
+      .isIn(['archive', 'restore', 'update', 'delete'])
+      .withMessage('Invalid bulk operation'),
+    body('contactIds')
+      .isArray({ min: 1 })
+      .withMessage('Contact IDs array is required and must not be empty'),
+    body('contactIds.*')
+      .isMongoId()
+      .withMessage('Each contact ID must be a valid MongoDB ID'),
+    body('updateData')
+      .if(body('operation').equals('update'))
+      .notEmpty()
+      .withMessage('Update data is required for update operation')
+  ],
+  
+  bulkImport: [
+    body('contacts')
+      .isArray({ min: 1 })
+      .withMessage('Contacts array is required and must not be empty'),
+    body('skipDuplicates')
+      .optional()
+      .isBoolean()
+      .withMessage('Skip duplicates must be true or false')
+  ]
+};
+
+// Analytics validation
+const analyticsValidation = {
+  track: [
+    body('action')
+      .isIn([
+        'contact_added', 'interaction_logged', 'interview_scheduled', 
+        'follow_up_completed', 'document_created', 'task_completed', 'goal_updated'
+      ])
+      .withMessage('Invalid analytics action'),
+    body('date')
+      .optional()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('Date must be in YYYY-MM-DD format')
+  ]
+};
+
+// Search validation
+const searchValidation = {
+  global: [
+    query('q')
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Search query must be between 2 and 100 characters')
+      .escape(),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 50 })
+      .withMessage('Limit must be between 1 and 50')
+  ]
+};
+
+// File upload validation
+const fileValidation = {
+  upload: [
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 1, max: 255 })
+      .withMessage('File name must be between 1 and 255 characters'),
+    body('type')
+      .optional()
+      .isIn(['pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'gif'])
+      .withMessage('Invalid file type'),
+    body('size')
+      .optional()
+      .isInt({ min: 1, max: 10485760 }) // 10MB max
+      .withMessage('File size must be between 1 byte and 10MB')
+  ]
+};
+
+// Custom validators
+const customValidators = {
+  // Validate MongoDB ObjectId
+  isValidObjectId: (value) => {
+    if (!value.match(/^[0-9a-fA-F]{24}$/)) {
+      throw new Error('Invalid ID format');
+    }
+    return true;
+  },
+  
+  // Validate date is not in the past (with optional tolerance)
+  isNotPastDate: (tolerance = 0) => (value) => {
+    const date = new Date(value);
+    const now = new Date();
+    now.setDate(now.getDate() - tolerance);
+    
+    if (date < now) {
+      throw new Error(`Date cannot be more than ${tolerance} days in the past`);
+    }
+    return true;
+  },
+  
+  // Validate date is not too far in the future
+  isNotFutureDateBeyond: (years = 5) => (value) => {
+    const date = new Date(value);
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + years);
+    
+    if (date > maxDate) {
+      throw new Error(`Date cannot be more than ${years} years in the future`);
+    }
+    return true;
+  },
+  
+  // Validate URL with specific domains
+  isValidDomain: (domains) => (value) => {
+    if (!value) return true; // Optional field
+    
+    try {
+      const url = new URL(value);
+      const isValidDomain = domains.some(domain => 
+        url.hostname.includes(domain)
+      );
+      
+      if (!isValidDomain) {
+        throw new Error(`URL must be from one of these domains: ${domains.join(', ')}`);
+      }
+      return true;
+    } catch {
+      throw new Error('Invalid URL format');
+    }
+  },
+  
+  // Validate array length
+  hasArrayLength: (min = 0, max = 100) => (value) => {
+    if (!Array.isArray(value)) {
+      throw new Error('Value must be an array');
+    }
+    if (value.length < min || value.length > max) {
+      throw new Error(`Array must have between ${min} and ${max} items`);
+    }
+    return true;
+  },
+  
+  // Validate phone number with country code
+  isValidPhoneNumber: (value) => {
+    if (!value) return true; // Optional field
+    
+    // Remove all non-digit characters except +
+    const cleaned = value.replace(/[^\d+]/g, '');
+    
+    // Check if it's a valid international format
+    if (!/^\+?[1-9]\d{7,14}$/.test(cleaned)) {
+      throw new Error('Please provide a valid phone number');
+    }
+    return true;
+  },
+  
+  // Validate password strength
+  isStrongPassword: (value) => {
+    const minLength = 8;
+    const hasUpper = /[A-Z]/.test(value);
+    const hasLower = /[a-z]/.test(value);
+    const hasNumber = /\d/.test(value);
+    
+    if (value.length < minLength) {
+      throw new Error(`Password must be at least ${minLength} characters long`);
+    }
+    if (!hasUpper) {
+      throw new Error('Password must contain at least one uppercase letter');
+    }
+    if (!hasLower) {
+      throw new Error('Password must contain at least one lowercase letter');
+    }
+    if (!hasNumber) {
+      throw new Error('Password must contain at least one number');
+    }
+    
+    return true;
+  },
+  
+  // Validate email domain
+  isValidEmailDomain: (allowedDomains) => (value) => {
+    if (!value) return true;
+    
+    const domain = value.split('@')[1];
+    if (allowedDomains && !allowedDomains.includes(domain)) {
+      throw new Error(`Email domain must be one of: ${allowedDomains.join(', ')}`);
+    }
+    return true;
+  },
+  
+  // Validate unique array values
+  hasUniqueValues: (value) => {
+    if (!Array.isArray(value)) return true;
+    
+    const uniqueValues = [...new Set(value)];
+    if (uniqueValues.length !== value.length) {
+      throw new Error('Array values must be unique');
+    }
+    return true;
+  }
+};
+
+// Sanitization helpers
+const sanitizers = {
+  // Remove HTML tags and encode special characters
+  sanitizeText: (value) => {
+    if (!value) return value;
+    return value
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/[<>&"']/g, (char) => { // Encode special characters
+        const entityMap = {
+          '<': '&lt;',
+          '>': '&gt;',
+          '&': '&amp;',
+          '"': '&quot;',
+          "'": '&#x27;'
+        };
+        return entityMap[char];
+      })
+      .trim();
+  },
+  
+  // Normalize and validate email
+  normalizeEmail: (value) => {
+    if (!value) return value;
+    return value.toLowerCase().trim();
+  },
+  
+  // Clean and format phone number
+  formatPhoneNumber: (value) => {
+    if (!value) return value;
+    
+    // Remove all non-digit characters except +
+    const cleaned = value.replace(/[^\d+]/g, '');
+    
+    // Add + if it starts with a digit and looks like international
+    if (/^\d{10,}$/.test(cleaned)) {
+      return `+${cleaned}`;
+    }
+    
+    return cleaned;
+  },
+  
+  // Clean URLs
+  normalizeUrl: (value) => {
+    if (!value) return value;
+    
+    let url = value.trim();
+    
+    // Add protocol if missing
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    
+    try {
+      const urlObj = new URL(url);
+      return urlObj.toString();
+    } catch {
+      return value; // Return original if invalid
+    }
+  },
+  
+  // Sanitize tags array
+  sanitizeTags: (tags) => {
+    if (!Array.isArray(tags)) return [];
+    
+    return tags
+      .map(tag => sanitizers.sanitizeText(tag))
+      .filter(tag => tag && tag.length > 0)
+      .slice(0, 20); // Limit to 20 tags
+  },
+  
+  // Clean and validate date string
+  normalizeDate: (value) => {
+    if (!value) return value;
+    
+    try {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return null;
+      
+      // Return in YYYY-MM-DD format
+      return date.toISOString().split('T')[0];
+    } catch {
+      return null;
+    }
+  }
+};
+
+// Validation middleware compositions
+const validationMiddleware = {
+  // Standard CRUD operations
+  standardCreate: (entityValidation) => [
+    ...entityValidation.create,
+    handleValidationErrors
+  ],
+  
+  standardUpdate: (entityValidation) => [
+    ...entityValidation.update,
+    handleValidationErrors
+  ],
+  
+  standardDelete: [
+    param('id').isMongoId().withMessage('Invalid ID'),
+    handleValidationErrors
+  ],
+  
+  // Pagination with search
+  paginatedList: [
+    ...paginationValidation,
+    handleValidationErrors
+  ],
+  
+  // Date range queries
+  dateRangeQuery: [
+    ...dateRangeValidation,
+    handleValidationErrors
+  ],
+  
+  // File upload
+  fileUpload: [
+    ...fileValidation.upload,
+    handleValidationErrors
+  ]
+};
+
+// Error response helpers
+const validationHelpers = {
+  // Create custom validation error
+  createValidationError: (field, message, value = null) => {
+    return {
+      field,
+      message,
+      value,
+      location: 'body'
+    };
+  },
+  
+  // Format validation errors for client
+  formatErrors: (errors) => {
+    return errors.map(error => ({
+      field: error.param || error.path,
+      message: error.msg,
+      value: error.value,
+      location: error.location
+    }));
+  },
+  
+  // Check if request has validation errors
+  hasValidationErrors: (req) => {
+    const errors = validationResult(req);
+    return !errors.isEmpty();
+  },
+  
+  // Get validation errors from request
+  getValidationErrors: (req) => {
+    const errors = validationResult(req);
+    return errors.array();
+  }
+};
+
+module.exports = {
+  handleValidationErrors,
+  userValidation,
+  contactValidation,
+  interviewValidation,
+  documentValidation,
+  taskValidation,
+  goalValidation,
+  paginationValidation,
+  dateRangeValidation,
+  bulkValidation,
+  analyticsValidation,
+  searchValidation,
+  fileValidation,
+  customValidators,
+  sanitizers,
+  validationMiddleware,
+  validationHelpers
+};
+    param('id')
+      .isMongoId()
+      .withMessage('Invalid contact ID'),
     body('name')
       .optional()
       .trim()
       .notEmpty()
       .isLength({ min: 1, max: 100 })
-      .withMessage('Name must be between 1 and 100 characters'),
+      .withMessage('Name must be between 1 and 100 characters')
+      .custom((value) => {
+        if (value && !/^[a-zA-Z\s\-\.,']+$/.test(value)) {
+          throw new Error('Name can only contain letters, spaces, hyphens, periods, commas, and apostrophes');
+        }
+        return true;
+      }),
     body('firm')
       .optional()
       .trim()
@@ -241,17 +755,41 @@ const contactValidation = {
       .withMessage('Position must be less than 100 characters'),
     body('email')
       .optional()
-      .isEmail()
-      .normalizeEmail()
-      .withMessage('Please provide a valid email address'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            throw new Error('Please provide a valid email address');
+          }
+        }
+        return true;
+      })
+      .normalizeEmail(),
     body('phone')
       .optional()
-      .matches(/^[\+]?[(]?[\d\s\-\(\)]{10,}$/)
-      .withMessage('Please provide a valid phone number'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          const phoneRegex = /^[\+]?[(]?[\d\s\-\(\)]{10,}$/;
+          if (!phoneRegex.test(value)) {
+            throw new Error('Please provide a valid phone number');
+          }
+        }
+        return true;
+      }),
     body('linkedin')
       .optional()
-      .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL'),
+      .custom((value) => {
+        if (value && value.trim() !== '') {
+          try {
+            new URL(value);
+            if (!value.includes('linkedin.com')) {
+              throw new Error('LinkedIn URL must be from linkedin.com');
+            }
+          } catch {
+            throw new Error('LinkedIn URL must be a valid URL');
+          }
+        }
+        return true;
+      }),
     body('networkingStatus')
       .optional()
       .isIn([
@@ -268,14 +806,74 @@ const contactValidation = {
       .optional()
       .isIn(['High', 'Medium', 'Low'])
       .withMessage('Invalid priority level'),
+    body('networkingDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('lastContactDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('nextStepsDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('nextSteps')
+      .optional()
+      .isIn([
+        'Send Initial Outreach', 'Schedule Intro Call', 'Prepare for Upcoming Call',
+        'Send Thank You Email', 'Send Resume', 'Send Follow-Up Email',
+        'Schedule Follow-Up Call', '', null
+      ])
+      .withMessage('Invalid next steps value'),
     body('referred')
       .optional()
-      .isBoolean()
-      .withMessage('Referred must be true or false'),
+      .custom((value) => {
+        if (value !== undefined && typeof value !== 'boolean' && value !== 'true' && value !== 'false') {
+          throw new Error('Referred must be true or false');
+        }
+        return true;
+      }),
     body('notes')
       .optional()
       .isLength({ max: 2000 })
-      .withMessage('Notes must be less than 2000 characters')
+      .withMessage('Notes must be less than 2000 characters'),
+    body('tags')
+      .optional()
+      .custom((value) => {
+        if (value !== undefined && !Array.isArray(value)) {
+          throw new Error('Tags must be an array');
+        }
+        if (Array.isArray(value)) {
+          for (const tag of value) {
+            if (typeof tag !== 'string' || tag.trim().length === 0 || tag.trim().length > 50) {
+              throw new Error('Each tag must be a string between 1 and 50 characters');
+            }
+          }
+        }
+        return true;
+      })
   ],
   
   addInteraction: [
@@ -290,8 +888,19 @@ const contactValidation = {
       .isLength({ min: 1, max: 200 })
       .withMessage('Title must be between 1 and 200 characters'),
     body('date')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .custom((value) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('time')
+      .optional()
+      .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+      .withMessage('Time must be in HH:MM format'),
     body('duration')
       .optional()
       .isInt({ min: 1, max: 600 })
@@ -711,449 +1320,4 @@ const goalValidation = {
       .optional()
       .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
       .withMessage('Invalid goal status')
-  ],
-  
-  update: [
-    param('id').isMongoId().withMessage('Invalid goal ID'),
-    body('title')
-      .optional()
-      .trim()
-      .notEmpty()
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('description')
-      .optional()
-      .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters'),
-    body('target')
-      .optional()
-      .isNumeric()
-      .withMessage('Target must be a number'),
-    body('current')
-      .optional()
-      .isNumeric()
-      .withMessage('Current value must be a number'),
-    body('status')
-      .optional()
-      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
-      .withMessage('Invalid goal status')
   ]
-};
-
-// Query parameter validation
-const paginationValidation = [
-  query('page')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100'),
-  query('search')
-    .optional()
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Search query must be between 1 and 100 characters')
-    .escape()
-];
-
-const dateRangeValidation = [
-  query('startDate')
-    .optional()
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('Start date must be in YYYY-MM-DD format'),
-  query('endDate')
-    .optional()
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('End date must be in YYYY-MM-DD format')
-    .custom((value, { req }) => {
-      if (req.query.startDate && new Date(value) <= new Date(req.query.startDate)) {
-        throw new Error('End date must be after start date');
-      }
-      return true;
-    })
-];
-
-// Bulk operations validation
-const bulkValidation = {
-  bulkUpdate: [
-    body('operation')
-      .isIn(['archive', 'restore', 'update', 'delete'])
-      .withMessage('Invalid bulk operation'),
-    body('contactIds')
-      .isArray({ min: 1 })
-      .withMessage('Contact IDs array is required and must not be empty'),
-    body('contactIds.*')
-      .isMongoId()
-      .withMessage('Each contact ID must be a valid MongoDB ID'),
-    body('updateData')
-      .if(body('operation').equals('update'))
-      .notEmpty()
-      .withMessage('Update data is required for update operation')
-  ],
-  
-  bulkImport: [
-    body('contacts')
-      .isArray({ min: 1 })
-      .withMessage('Contacts array is required and must not be empty'),
-    body('skipDuplicates')
-      .optional()
-      .isBoolean()
-      .withMessage('Skip duplicates must be true or false')
-  ]
-};
-
-// Analytics validation
-const analyticsValidation = {
-  track: [
-    body('action')
-      .isIn([
-        'contact_added', 'interaction_logged', 'interview_scheduled', 
-        'follow_up_completed', 'document_created', 'task_completed', 'goal_updated'
-      ])
-      .withMessage('Invalid analytics action'),
-    body('date')
-      .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format')
-  ]
-};
-
-// Search validation
-const searchValidation = {
-  global: [
-    query('q')
-      .trim()
-      .isLength({ min: 2, max: 100 })
-      .withMessage('Search query must be between 2 and 100 characters')
-      .escape(),
-    query('limit')
-      .optional()
-      .isInt({ min: 1, max: 50 })
-      .withMessage('Limit must be between 1 and 50')
-  ]
-};
-
-// File upload validation
-const fileValidation = {
-  upload: [
-    body('name')
-      .optional()
-      .trim()
-      .isLength({ min: 1, max: 255 })
-      .withMessage('File name must be between 1 and 255 characters'),
-    body('type')
-      .optional()
-      .isIn(['pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg', 'gif'])
-      .withMessage('Invalid file type'),
-    body('size')
-      .optional()
-      .isInt({ min: 1, max: 10485760 }) // 10MB max
-      .withMessage('File size must be between 1 byte and 10MB')
-  ]
-};
-
-// Custom validators
-const customValidators = {
-  // Validate MongoDB ObjectId
-  isValidObjectId: (value) => {
-    if (!value.match(/^[0-9a-fA-F]{24}$/)) {
-      throw new Error('Invalid ID format');
-    }
-    return true;
-  },
-  
-  // Validate date is not in the past (with optional tolerance)
-  isNotPastDate: (tolerance = 0) => (value) => {
-    const date = new Date(value);
-    const now = new Date();
-    now.setDate(now.getDate() - tolerance);
-    
-    if (date < now) {
-      throw new Error(`Date cannot be more than ${tolerance} days in the past`);
-    }
-    return true;
-  },
-  
-  // Validate date is not too far in the future
-  isNotFutureDateBeyond: (years = 5) => (value) => {
-    const date = new Date(value);
-    const maxDate = new Date();
-    maxDate.setFullYear(maxDate.getFullYear() + years);
-    
-    if (date > maxDate) {
-      throw new Error(`Date cannot be more than ${years} years in the future`);
-    }
-    return true;
-  },
-  
-  // Validate URL with specific domains
-  isValidDomain: (domains) => (value) => {
-    if (!value) return true; // Optional field
-    
-    try {
-      const url = new URL(value);
-      const isValidDomain = domains.some(domain => 
-        url.hostname.includes(domain)
-      );
-      
-      if (!isValidDomain) {
-        throw new Error(`URL must be from one of these domains: ${domains.join(', ')}`);
-      }
-      return true;
-    } catch {
-      throw new Error('Invalid URL format');
-    }
-  },
-  
-  // Validate array length
-  hasArrayLength: (min = 0, max = 100) => (value) => {
-    if (!Array.isArray(value)) {
-      throw new Error('Value must be an array');
-    }
-    if (value.length < min || value.length > max) {
-      throw new Error(`Array must have between ${min} and ${max} items`);
-    }
-    return true;
-  },
-  
-  // Validate phone number with country code
-  isValidPhoneNumber: (value) => {
-    if (!value) return true; // Optional field
-    
-    // Remove all non-digit characters except +
-    const cleaned = value.replace(/[^\d+]/g, '');
-    
-    // Check if it's a valid international format
-    if (!/^\+?[1-9]\d{7,14}$/.test(cleaned)) {
-      throw new Error('Please provide a valid phone number');
-    }
-    return true;
-  },
-  
-  // Validate password strength
-  isStrongPassword: (value) => {
-    const minLength = 8;
-    const hasUpper = /[A-Z]/.test(value);
-    const hasLower = /[a-z]/.test(value);
-    const hasNumber = /\d/.test(value);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value);
-    
-    if (value.length < minLength) {
-      throw new Error(`Password must be at least ${minLength} characters long`);
-    }
-    if (!hasUpper) {
-      throw new Error('Password must contain at least one uppercase letter');
-    }
-    if (!hasLower) {
-      throw new Error('Password must contain at least one lowercase letter');
-    }
-    if (!hasNumber) {
-      throw new Error('Password must contain at least one number');
-    }
-    
-    return true;
-  },
-  
-  // Validate email domain
-  isValidEmailDomain: (allowedDomains) => (value) => {
-    if (!value) return true;
-    
-    const domain = value.split('@')[1];
-    if (allowedDomains && !allowedDomains.includes(domain)) {
-      throw new Error(`Email domain must be one of: ${allowedDomains.join(', ')}`);
-    }
-    return true;
-  },
-  
-  // Validate unique array values
-  hasUniqueValues: (value) => {
-    if (!Array.isArray(value)) return true;
-    
-    const uniqueValues = [...new Set(value)];
-    if (uniqueValues.length !== value.length) {
-      throw new Error('Array values must be unique');
-    }
-    return true;
-  }
-};
-
-// Sanitization helpers
-const sanitizers = {
-  // Remove HTML tags and encode special characters
-  sanitizeText: (value) => {
-    if (!value) return value;
-    return value
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/[<>&"']/g, (char) => { // Encode special characters
-        const entityMap = {
-          '<': '&lt;',
-          '>': '&gt;',
-          '&': '&amp;',
-          '"': '&quot;',
-          "'": '&#x27;'
-        };
-        return entityMap[char];
-      })
-      .trim();
-  },
-  
-  // Normalize and validate email
-  normalizeEmail: (value) => {
-    if (!value) return value;
-    return value.toLowerCase().trim();
-  },
-  
-  // Clean and format phone number
-  formatPhoneNumber: (value) => {
-    if (!value) return value;
-    
-    // Remove all non-digit characters except +
-    const cleaned = value.replace(/[^\d+]/g, '');
-    
-    // Add + if it starts with a digit and looks like international
-    if (/^\d{10,}$/.test(cleaned)) {
-      return `+${cleaned}`;
-    }
-    
-    return cleaned;
-  },
-  
-  // Clean URLs
-  normalizeUrl: (value) => {
-    if (!value) return value;
-    
-    let url = value.trim();
-    
-    // Add protocol if missing
-    if (!/^https?:\/\//i.test(url)) {
-      url = `https://${url}`;
-    }
-    
-    try {
-      const urlObj = new URL(url);
-      return urlObj.toString();
-    } catch {
-      return value; // Return original if invalid
-    }
-  },
-  
-  // Sanitize tags array
-  sanitizeTags: (tags) => {
-    if (!Array.isArray(tags)) return [];
-    
-    return tags
-      .map(tag => sanitizers.sanitizeText(tag))
-      .filter(tag => tag && tag.length > 0)
-      .slice(0, 20); // Limit to 20 tags
-  },
-  
-  // Clean and validate date string
-  normalizeDate: (value) => {
-    if (!value) return value;
-    
-    try {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return null;
-      
-      // Return in YYYY-MM-DD format
-      return date.toISOString().split('T')[0];
-    } catch {
-      return null;
-    }
-  }
-};
-
-// Validation middleware compositions
-const validationMiddleware = {
-  // Standard CRUD operations
-  standardCreate: (entityValidation) => [
-    ...entityValidation.create,
-    handleValidationErrors
-  ],
-  
-  standardUpdate: (entityValidation) => [
-    ...entityValidation.update,
-    handleValidationErrors
-  ],
-  
-  standardDelete: [
-    param('id').isMongoId().withMessage('Invalid ID'),
-    handleValidationErrors
-  ],
-  
-  // Pagination with search
-  paginatedList: [
-    ...paginationValidation,
-    handleValidationErrors
-  ],
-  
-  // Date range queries
-  dateRangeQuery: [
-    ...dateRangeValidation,
-    handleValidationErrors
-  ],
-  
-  // File upload
-  fileUpload: [
-    ...fileValidation.upload,
-    handleValidationErrors
-  ]
-};
-
-// Error response helpers
-const validationHelpers = {
-  // Create custom validation error
-  createValidationError: (field, message, value = null) => {
-    return {
-      field,
-      message,
-      value,
-      location: 'body'
-    };
-  },
-  
-  // Format validation errors for client
-  formatErrors: (errors) => {
-    return errors.map(error => ({
-      field: error.param || error.path,
-      message: error.msg,
-      value: error.value,
-      location: error.location
-    }));
-  },
-  
-  // Check if request has validation errors
-  hasValidationErrors: (req) => {
-    const errors = validationResult(req);
-    return !errors.isEmpty();
-  },
-  
-  // Get validation errors from request
-  getValidationErrors: (req) => {
-    const errors = validationResult(req);
-    return errors.array();
-  }
-};
-
-module.exports = {
-  handleValidationErrors,
-  userValidation,
-  contactValidation,
-  interviewValidation,
-  documentValidation,
-  taskValidation,
-  goalValidation,
-  paginationValidation,
-  dateRangeValidation,
-  bulkValidation,
-  analyticsValidation,
-  searchValidation,
-  fileValidation,
-  customValidators,
-  sanitizers,
-  validationMiddleware,
-  validationHelpers
-};
