@@ -2,6 +2,7 @@ const express = require('express');
 const { Contact } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -205,8 +206,72 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
     // Check for duplicate contacts (same name and firm)
     const existingContact = await Contact.findOne({
       userId: req.user.id,
-      name: { $regex: new RegExp(`^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      firm: { $regex: new RegExp(`^${cleanedData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      name: { $regex: new RegExp(`^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+const { Contact } = require('../models');
+const { authenticateToken } = require('../middleware/auth');
+const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get all contacts with filtering, search, and pagination
+router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search, 
+      networkingStatus, 
+      firm, 
+      group, 
+      priority,
+      referred,
+      tags,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = { userId: req.user.id, isArchived: { $ne: true } };
+    
+    // Search functionality
+    if (search) {
+      const searchReg')}, 'i') },
+      firm: { $regex: new RegExp(`^${cleanedData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+const { Contact } = require('../models');
+const { authenticateToken } = require('../middleware/auth');
+const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get all contacts with filtering, search, and pagination
+router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search, 
+      networkingStatus, 
+      firm, 
+      group, 
+      priority,
+      referred,
+      tags,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = { userId: req.user.id, isArchived: { $ne: true } };
+    
+    // Search functionality
+    if (search) {
+      const searchReg')}, 'i') },
       isArchived: { $ne: true }
     });
 
@@ -265,6 +330,14 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
 // Get single contact by ID
 router.get('/:id', async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOne({ 
       _id: req.params.id, 
       userId: req.user.id 
@@ -280,12 +353,6 @@ router.get('/:id', async (req, res) => {
     res.json({ contact });
   } catch (error) {
     console.error('Contact fetch error:', error);
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        message: 'Invalid contact ID format',
-        code: 'INVALID_CONTACT_ID'
-      });
-    }
     res.status(500).json({ 
       message: 'Error fetching contact',
       code: 'CONTACT_FETCH_ERROR'
@@ -296,6 +363,16 @@ router.get('/:id', async (req, res) => {
 // Update contact
 router.put('/:id', contactValidation.update, handleValidationErrors, async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
+    console.log('📝 Updating contact:', req.params.id, req.body);
+
     // Clean and sanitize input data
     const updateData = {};
     
@@ -322,18 +399,47 @@ router.put('/:id', contactValidation.update, handleValidationErrors, async (req,
     
     updateData.updatedAt = new Date();
 
-    const contact = await Contact.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      updateData,
-      { new: true, runValidators: true }
-    );
-    
-    if (!contact) {
+    console.log('🔄 Update data prepared:', updateData);
+
+    // First, verify the contact exists and belongs to the user
+    const existingContact = await Contact.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!existingContact) {
+      console.log('❌ Contact not found for user:', req.params.id, req.user.id);
       return res.status(404).json({ 
         message: 'Contact not found',
         code: 'CONTACT_NOT_FOUND'
       });
     }
+
+    console.log('✅ Existing contact found:', existingContact._id);
+
+    // Update the specific contact
+    const contact = await Contact.findOneAndUpdate(
+      { 
+        _id: req.params.id, 
+        userId: req.user.id 
+      },
+      updateData,
+      { 
+        new: true, 
+        runValidators: true,
+        lean: false  // Return mongoose document, not plain object
+      }
+    );
+    
+    if (!contact) {
+      console.log('❌ Contact update failed - contact not found');
+      return res.status(404).json({ 
+        message: 'Contact not found or update failed',
+        code: 'CONTACT_NOT_FOUND'
+      });
+    }
+    
+    console.log('✅ Contact updated successfully:', contact._id);
     
     res.json({ 
       message: 'Contact updated successfully', 
@@ -341,13 +447,6 @@ router.put('/:id', contactValidation.update, handleValidationErrors, async (req,
     });
   } catch (error) {
     console.error('Contact update error:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        message: 'Invalid contact ID format',
-        code: 'INVALID_CONTACT_ID'
-      });
-    }
     
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => ({
@@ -374,6 +473,14 @@ router.put('/:id', contactValidation.update, handleValidationErrors, async (req,
 // Delete contact (soft delete)
 router.delete('/:id', async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       { isArchived: true, archivedAt: new Date() },
@@ -393,12 +500,6 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Contact deletion error:', error);
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        message: 'Invalid contact ID format',
-        code: 'INVALID_CONTACT_ID'
-      });
-    }
     res.status(500).json({ 
       message: 'Error archiving contact',
       code: 'CONTACT_DELETE_ERROR'
@@ -409,6 +510,14 @@ router.delete('/:id', async (req, res) => {
 // Restore archived contact
 router.patch('/:id/restore', async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id, isArchived: true },
       { isArchived: false, $unset: { archivedAt: 1 }, updatedAt: new Date() },
@@ -438,6 +547,14 @@ router.patch('/:id/restore', async (req, res) => {
 // Add interaction to contact
 router.post('/:id/interactions', contactValidation.addInteraction, handleValidationErrors, async (req, res) => {
   try {
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOne({ 
       _id: req.params.id, 
       userId: req.user.id 
@@ -487,6 +604,14 @@ router.post('/:id/interactions', contactValidation.addInteraction, handleValidat
 // Update interaction
 router.put('/:contactId/interactions/:interactionId', async (req, res) => {
   try {
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(req.params.contactId)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOne({ 
       _id: req.params.contactId, 
       userId: req.user.id 
@@ -538,6 +663,14 @@ router.put('/:contactId/interactions/:interactionId', async (req, res) => {
 // Delete interaction
 router.delete('/:contactId/interactions/:interactionId', async (req, res) => {
   try {
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(req.params.contactId)) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID'
+      });
+    }
+
     const contact = await Contact.findOne({ 
       _id: req.params.contactId, 
       userId: req.user.id 
@@ -584,6 +717,16 @@ router.post('/bulk', async (req, res) => {
       return res.status(400).json({
         message: 'Operation and contact IDs are required',
         code: 'MISSING_BULK_PARAMS'
+      });
+    }
+
+    // Validate all ObjectIds
+    const invalidIds = contactIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        message: 'Invalid contact ID format',
+        code: 'INVALID_CONTACT_ID',
+        invalidIds
       });
     }
 
@@ -714,8 +857,72 @@ router.post('/import', async (req, res) => {
         if (skipDuplicates) {
           const existing = await Contact.findOne({
             userId,
-            name: { $regex: new RegExp(`^${contactData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-            firm: { $regex: new RegExp(`^${contactData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+            name: { $regex: new RegExp(`^${contactData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+const { Contact } = require('../models');
+const { authenticateToken } = require('../middleware/auth');
+const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get all contacts with filtering, search, and pagination
+router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search, 
+      networkingStatus, 
+      firm, 
+      group, 
+      priority,
+      referred,
+      tags,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = { userId: req.user.id, isArchived: { $ne: true } };
+    
+    // Search functionality
+    if (search) {
+      const searchReg')}, 'i') },
+            firm: { $regex: new RegExp(`^${contactData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+const { Contact } = require('../models');
+const { authenticateToken } = require('../middleware/auth');
+const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
+
+const router = express.Router();
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get all contacts with filtering, search, and pagination
+router.get('/', paginationValidation, handleValidationErrors, async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search, 
+      networkingStatus, 
+      firm, 
+      group, 
+      priority,
+      referred,
+      tags,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = { userId: req.user.id, isArchived: { $ne: true } };
+    
+    // Search functionality
+    if (search) {
+      const searchReg')}, 'i') },
             isArchived: { $ne: true }
           });
 
