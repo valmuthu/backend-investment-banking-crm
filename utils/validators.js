@@ -949,7 +949,8 @@ module.exports = {
         return true;
       })
   ],
-  
+
+const validators = {
   addInteraction: [
     param('id').isMongoId().withMessage('Invalid contact ID'),
     body('type')
