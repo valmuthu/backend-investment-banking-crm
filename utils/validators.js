@@ -127,7 +127,7 @@ const userValidation = {
   ]
 };
 
-// Contact validation
+// Contact validation - Fixed and improved
 const contactValidation = {
   create: [
     body('name')
@@ -143,25 +143,33 @@ const contactValidation = {
       .isLength({ min: 1, max: 100 })
       .withMessage('Firm name must be between 1 and 100 characters'),
     body('position')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .trim()
       .isLength({ max: 100 })
       .withMessage('Position must be less than 100 characters'),
     body('email')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isEmail()
       .normalizeEmail()
       .withMessage('Please provide a valid email address'),
     body('phone')
-      .optional()
-      .matches(/^[\+]?[(]?[\d\s\-\(\)]{10,}$/)
-      .withMessage('Please provide a valid phone number'),
+      .optional({ nullable: true, checkFalsy: true })
+      .custom((value) => {
+        if (value && !/^[\+]?[(]?[\d\s\-\(\)]{10,}$/.test(value)) {
+          throw new Error('Please provide a valid phone number');
+        }
+        return true;
+      }),
     body('linkedin')
-      .optional()
-      .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL'),
+      .optional({ nullable: true, checkFalsy: true })
+      .custom((value) => {
+        if (value && !/^https?:\/\/.+/.test(value)) {
+          throw new Error('LinkedIn URL must be a valid URL');
+        }
+        return true;
+      }),
     body('group')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .trim()
       .isLength({ max: 50 })
       .withMessage('Group must be less than 50 characters'),
@@ -174,7 +182,7 @@ const contactValidation = {
       ])
       .withMessage('Invalid networking status'),
     body('seniority')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn(['Analyst', 'Associate', 'VP', 'Director', 'MD', 'Other'])
       .withMessage('Invalid seniority level'),
     body('priority')
@@ -182,19 +190,19 @@ const contactValidation = {
       .isIn(['High', 'Medium', 'Low'])
       .withMessage('Invalid priority level'),
     body('networkingDate')
-      .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .optional({ nullable: true, checkFalsy: true })
+      .isISO8601()
+      .withMessage('Networking date must be a valid date'),
     body('lastContactDate')
-      .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .optional({ nullable: true, checkFalsy: true })
+      .isISO8601()
+      .withMessage('Last contact date must be a valid date'),
     body('nextStepsDate')
-      .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .optional({ nullable: true, checkFalsy: true })
+      .isISO8601()
+      .withMessage('Next steps date must be a valid date'),
     body('nextSteps')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn([
         'Send Initial Outreach', 'Schedule Intro Call', 'Prepare for Upcoming Call',
         'Send Thank You Email', 'Send Resume', 'Send Follow-Up Email',
@@ -206,7 +214,7 @@ const contactValidation = {
       .isBoolean()
       .withMessage('Referred must be true or false'),
     body('notes')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters'),
     body('tags')
@@ -221,7 +229,13 @@ const contactValidation = {
   ],
   
   update: [
-    param('id').isMongoId().withMessage('Invalid contact ID'),
+    param('id')
+      .custom((value) => {
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid contact ID');
+        }
+        return true;
+      }),
     body('name')
       .optional()
       .trim()
@@ -235,23 +249,31 @@ const contactValidation = {
       .isLength({ min: 1, max: 100 })
       .withMessage('Firm name must be between 1 and 100 characters'),
     body('position')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .trim()
       .isLength({ max: 100 })
       .withMessage('Position must be less than 100 characters'),
     body('email')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isEmail()
       .normalizeEmail()
       .withMessage('Please provide a valid email address'),
     body('phone')
-      .optional()
-      .matches(/^[\+]?[(]?[\d\s\-\(\)]{10,}$/)
-      .withMessage('Please provide a valid phone number'),
+      .optional({ nullable: true, checkFalsy: true })
+      .custom((value) => {
+        if (value && !/^[\+]?[(]?[\d\s\-\(\)]{10,}$/.test(value)) {
+          throw new Error('Please provide a valid phone number');
+        }
+        return true;
+      }),
     body('linkedin')
-      .optional()
-      .isURL({ protocols: ['http', 'https'] })
-      .withMessage('LinkedIn URL must be a valid URL'),
+      .optional({ nullable: true, checkFalsy: true })
+      .custom((value) => {
+        if (value && !/^https?:\/\/.+/.test(value)) {
+          throw new Error('LinkedIn URL must be a valid URL');
+        }
+        return true;
+      }),
     body('networkingStatus')
       .optional()
       .isIn([
@@ -261,7 +283,7 @@ const contactValidation = {
       ])
       .withMessage('Invalid networking status'),
     body('seniority')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn(['Analyst', 'Associate', 'VP', 'Director', 'MD', 'Other'])
       .withMessage('Invalid seniority level'),
     body('priority')
@@ -273,13 +295,19 @@ const contactValidation = {
       .isBoolean()
       .withMessage('Referred must be true or false'),
     body('notes')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters')
   ],
   
   addInteraction: [
-    param('id').isMongoId().withMessage('Invalid contact ID'),
+    param('id')
+      .custom((value) => {
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid contact ID');
+        }
+        return true;
+      }),
     body('type')
       .isIn(['Call', 'Email', 'Meeting', 'Note', 'Coffee Chat', 'Event'])
       .withMessage('Invalid interaction type'),
@@ -290,8 +318,8 @@ const contactValidation = {
       .isLength({ min: 1, max: 200 })
       .withMessage('Title must be between 1 and 200 characters'),
     body('date')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Date must be a valid date'),
     body('duration')
       .optional()
       .isInt({ min: 1, max: 600 })
@@ -344,16 +372,16 @@ const interviewValidation = {
       .withMessage('Invalid interview stage'),
     body('stageDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Stage date must be a valid date'),
     body('applicationDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Application date must be a valid date'),
     body('deadline')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Deadline must be a valid date'),
     body('priority')
       .optional()
       .isIn(['High', 'Medium', 'Low'])
@@ -368,20 +396,29 @@ const interviewValidation = {
       .withMessage('Invalid next steps value'),
     body('nextStepsDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Next steps date must be a valid date'),
     body('notes')
       .optional()
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters'),
     body('referralContactId')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid referral contact ID')
+      .custom((value) => {
+        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid referral contact ID');
+        }
+        return true;
+      })
   ],
   
   update: [
-    param('id').isMongoId().withMessage('Invalid interview ID'),
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid interview ID');
+      }
+      return true;
+    }),
     body('firm')
       .optional()
       .trim()
@@ -431,13 +468,18 @@ const interviewValidation = {
   ],
   
   addRound: [
-    param('id').isMongoId().withMessage('Invalid interview ID'),
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid interview ID');
+      }
+      return true;
+    }),
     body('stage')
       .isIn(['Phone Screen', 'First Round', 'Second Round', 'Third Round', 'Case Study', 'Superday', 'Final Round'])
       .withMessage('Invalid interview round stage'),
     body('date')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Date must be a valid date'),
     body('time')
       .optional()
       .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -523,7 +565,12 @@ const documentValidation = {
   ],
   
   update: [
-    param('id').isMongoId().withMessage('Invalid document ID'),
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid document ID');
+      }
+      return true;
+    }),
     body('name')
       .optional()
       .trim()
@@ -585,8 +632,8 @@ const taskValidation = {
       .withMessage('Invalid priority level'),
     body('dueDate')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Due date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Due date must be a valid date'),
     body('dueTime')
       .optional()
       .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -597,16 +644,28 @@ const taskValidation = {
       .withMessage('Estimated duration must be between 5 and 600 minutes'),
     body('relatedContact')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid contact ID'),
+      .custom((value) => {
+        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid contact ID');
+        }
+        return true;
+      }),
     body('relatedInterview')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid interview ID'),
+      .custom((value) => {
+        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid interview ID');
+        }
+        return true;
+      }),
     body('relatedDocument')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid document ID'),
+      .custom((value) => {
+        if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Invalid document ID');
+        }
+        return true;
+      }),
     body('tags')
       .optional()
       .isArray()
@@ -618,7 +677,12 @@ const taskValidation = {
   ],
   
   update: [
-    param('id').isMongoId().withMessage('Invalid task ID'),
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid task ID');
+      }
+      return true;
+    }),
     body('title')
       .optional()
       .trim()
@@ -696,44 +760,17 @@ const goalValidation = {
       .isIn(['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly', 'Custom'])
       .withMessage('Invalid timeframe'),
     body('startDate')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Start date must be in YYYY-MM-DD format'),
+      .isISO8601()
+      .withMessage('Start date must be a valid date'),
     body('endDate')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('End date must be in YYYY-MM-DD format')
+      .isISO8601()
+      .withMessage('End date must be a valid date')
       .custom((value, { req }) => {
         if (new Date(value) <= new Date(req.body.startDate)) {
           throw new Error('End date must be after start date');
         }
         return true;
       }),
-    body('status')
-      .optional()
-      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
-      .withMessage('Invalid goal status')
-  ],
-  
-  update: [
-    param('id').isMongoId().withMessage('Invalid goal ID'),
-    body('title')
-      .optional()
-      .trim()
-      .notEmpty()
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('description')
-      .optional()
-      .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters'),
-    body('target')
-      .optional()
-      .isNumeric()
-      .withMessage('Target must be a number'),
-    body('current')
-      .optional()
-      .isNumeric()
-      .withMessage('Current value must be a number'),
     body('status')
       .optional()
       .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
@@ -756,18 +793,17 @@ const paginationValidation = [
     .trim()
     .isLength({ min: 1, max: 100 })
     .withMessage('Search query must be between 1 and 100 characters')
-    .escape()
 ];
 
 const dateRangeValidation = [
   query('startDate')
     .optional()
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('Start date must be in YYYY-MM-DD format'),
+    .isISO8601()
+    .withMessage('Start date must be a valid date'),
   query('endDate')
     .optional()
-    .matches(/^\d{4}-\d{2}-\d{2}$/)
-    .withMessage('End date must be in YYYY-MM-DD format')
+    .isISO8601()
+    .withMessage('End date must be a valid date')
     .custom((value, { req }) => {
       if (req.query.startDate && new Date(value) <= new Date(req.query.startDate)) {
         throw new Error('End date must be after start date');
@@ -786,8 +822,12 @@ const bulkValidation = {
       .isArray({ min: 1 })
       .withMessage('Contact IDs array is required and must not be empty'),
     body('contactIds.*')
-      .isMongoId()
-      .withMessage('Each contact ID must be a valid MongoDB ID'),
+      .custom((value) => {
+        if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+          throw new Error('Each contact ID must be a valid MongoDB ID');
+        }
+        return true;
+      }),
     body('updateData')
       .if(body('operation').equals('update'))
       .notEmpty()
@@ -816,8 +856,8 @@ const analyticsValidation = {
       .withMessage('Invalid analytics action'),
     body('date')
       .optional()
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Date must be in YYYY-MM-DD format')
+      .isISO8601()
+      .withMessage('Date must be a valid date')
   ]
 };
 
@@ -827,8 +867,7 @@ const searchValidation = {
     query('q')
       .trim()
       .isLength({ min: 2, max: 100 })
-      .withMessage('Search query must be between 2 and 100 characters')
-      .escape(),
+      .withMessage('Search query must be between 2 and 100 characters'),
     query('limit')
       .optional()
       .isInt({ min: 1, max: 50 })
@@ -1080,7 +1119,12 @@ const validationMiddleware = {
   ],
   
   standardDelete: [
-    param('id').isMongoId().withMessage('Invalid ID'),
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid ID');
+      }
+      return true;
+    }),
     handleValidationErrors
   ],
   
@@ -1156,4 +1200,36 @@ module.exports = {
   sanitizers,
   validationMiddleware,
   validationHelpers
-};
+};('Invalid goal status')
+  ],
+  
+  update: [
+    param('id').custom((value) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid goal ID');
+      }
+      return true;
+    }),
+    body('title')
+      .optional()
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 200 })
+      .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
+    body('target')
+      .optional()
+      .isNumeric()
+      .withMessage('Target must be a number'),
+    body('current')
+      .optional()
+      .isNumeric()
+      .withMessage('Current value must be a number'),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
+      .withMessage
