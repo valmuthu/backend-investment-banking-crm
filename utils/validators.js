@@ -174,11 +174,11 @@ const contactValidation = {
       .isLength({ max: 50 })
       .withMessage('Group must be less than 50 characters'),
     body('networkingStatus')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn([
         'Not Yet Contacted', 'Initial Outreach Sent', 'Intro Call Scheduled',
         'Intro Call Complete', 'Follow-Up Email Sent', 'Follow-Up Call Scheduled',
-        'Follow-Up Call Complete', 'Regular Contact'
+        'Follow-Up Call Complete', 'Regular Contact', '', null 
       ])
       .withMessage('Invalid networking status'),
     body('priority')
