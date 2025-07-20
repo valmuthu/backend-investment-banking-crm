@@ -245,9 +245,11 @@ router.get('/', paginationValidation, handleValidationErrors, async (req, res) =
     const query = { userId: req.user.id, isArchived: { $ne: true } };
     
     // Search functionality
-    if (search) {
-      const searchReg')}, 'i') },
-      firm: { $regex: new RegExp(`^${cleanedData.firm.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+   if (search) {
+  const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  query.name = { $regex: escapedSearch, $options: 'i' };
+}
+      
 const { Contact } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
