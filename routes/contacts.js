@@ -191,7 +191,7 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
       phone: req.body.phone?.trim() || '',
       linkedin: req.body.linkedin?.trim() || '',
       networkingStatus: req.body.networkingStatus || 'Not Yet Contacted',
-      seniority: req.body.seniority || '',
+      seniority: req.body.seniority || null,
       priority: req.body.priority || 'Medium',
       networkingDate: req.body.networkingDate || null,
       lastContactDate: req.body.lastContactDate || null,
