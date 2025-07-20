@@ -18,7 +18,6 @@ router.get('/', paginationValidation, handleValidationErrors, async (req, res) =
       networkingStatus, 
       firm, 
       group, 
-      seniority,
       priority,
       referred,
       tags,
@@ -45,7 +44,6 @@ router.get('/', paginationValidation, handleValidationErrors, async (req, res) =
     if (networkingStatus) query.networkingStatus = networkingStatus;
     if (firm) query.firm = { $regex: firm, $options: 'i' };
     if (group) query.group = { $regex: group, $options: 'i' };
-    if (seniority) query.seniority = seniority;
     if (priority) query.priority = priority;
     if (referred !== undefined) query.referred = referred === 'true';
     if (tags) {
@@ -191,7 +189,6 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
       phone: req.body.phone?.trim() || '',
       linkedin: req.body.linkedin?.trim() || '',
       networkingStatus: req.body.networkingStatus || 'Not Yet Contacted',
-      seniority: req.body.seniority || null,
       priority: req.body.priority || 'Medium',
       networkingDate: req.body.networkingDate || null,
       lastContactDate: req.body.lastContactDate || null,
@@ -305,7 +302,7 @@ router.put('/:id', contactValidation.update, handleValidationErrors, async (req,
     // Only include fields that are actually being updated
     const allowedFields = [
       'name', 'firm', 'position', 'group', 'email', 'phone', 'linkedin',
-      'networkingStatus', 'seniority', 'priority', 'networkingDate',
+      'networkingStatus', 'priority', 'networkingDate',
       'lastContactDate', 'nextStepsDate', 'nextSteps', 'referred', 'notes', 'tags'
     ];
     
@@ -738,7 +735,6 @@ router.post('/import', async (req, res) => {
           phone: contactData.phone?.trim() || '',
           linkedin: contactData.linkedin?.trim() || '',
           networkingStatus: contactData.networkingStatus || 'Not Yet Contacted',
-          seniority: contactData.seniority || '',
           priority: contactData.priority || 'Medium',
           referred: Boolean(contactData.referred),
           notes: contactData.notes?.trim() || '',
