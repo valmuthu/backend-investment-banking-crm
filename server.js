@@ -340,11 +340,15 @@ const gracefulShutdown = (signal) => {
     
     console.log('✅ HTTP server closed');
     
-    mongoose.connection.close(false, () => {
+   try {
+      await mongoose.connection.close(false);  // pass false if you want no force close, but check docs if needed
       console.log('✅ MongoDB connection closed');
       console.log('👋 Graceful shutdown completed');
       process.exit(0);
-    });
+    } catch (err) {
+      console.error('❌ Error closing MongoDB connection:', err);
+      process.exit(1);
+    }
   });
   
   // Force close after 10 seconds
