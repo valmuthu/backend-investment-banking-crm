@@ -798,6 +798,7 @@ module.exports = {
         }
         return true;
       })
+  ],
   
   update: [
     param('id')
@@ -1297,5 +1298,26 @@ const taskValidation = {
       .optional()
       .isLength({ max: 1000 })
       .withMessage('Notes must be less than 1000 characters')
-  ]
-    
+  ],
+  
+  update: [
+    param('id').isMongoId().withMessage('Invalid task ID'),
+    body('title')
+      .optional()
+      .trim()
+      .notEmpty()
+      .isLength({ min: 1, max: 200 })
+      .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
+    body('status')
+      .optional()
+      .isIn(['Pending', 'In Progress', 'Completed', 'Cancelled'])
+      .withMessage('Invalid task status'),
+    body('priority')
+      .optional()
+      .isIn(['High', 'Medium', 'Low'])
+      .withMessage('Invalid priority level'),
