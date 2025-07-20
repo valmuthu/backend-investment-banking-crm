@@ -212,74 +212,79 @@ const contactValidation = {
       .optional()
       .isIn(['High', 'Medium', 'Low'])
       .withMessage('Invalid priority level'),
-    body('networkingDate')
+    body('actualDuration')
       .optional()
-      .custom((value) => {
-        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          throw new Error('Date must be in YYYY-MM-DD format');
-        }
-        if (value && isNaN(Date.parse(value))) {
-          throw new Error('Please provide a valid date');
-        }
-        return true;
-      }),
-    body('lastContactDate')
+      .isInt({ min: 1, max: 600 })
+      .withMessage('Actual duration must be between 1 and 600 minutes'),
+    body('completedAt')
       .optional()
-      .custom((value) => {
-        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          throw new Error('Date must be in YYYY-MM-DD format');
-        }
-        if (value && isNaN(Date.parse(value))) {
-          throw new Error('Please provide a valid date');
-        }
-        return true;
-      }),
-    body('nextStepsDate')
-      .optional()
-      .custom((value) => {
-        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          throw new Error('Date must be in YYYY-MM-DD format');
-        }
-        if (value && isNaN(Date.parse(value))) {
-          throw new Error('Please provide a valid date');
-        }
-        return true;
-      }),
-    body('nextSteps')
-      .optional()
-      .isIn([
-        'Send Initial Outreach', 'Schedule Intro Call', 'Prepare for Upcoming Call',
-        'Send Thank You Email', 'Send Resume', 'Send Follow-Up Email',
-        'Schedule Follow-Up Call', '', null
-      ])
-      .withMessage('Invalid next steps value'),
-    body('referred')
-      .optional()
-      .custom((value) => {
-        if (value !== undefined && typeof value !== 'boolean' && value !== 'true' && value !== 'false') {
-          throw new Error('Referred must be true or false');
-        }
-        return true;
-      }),
+      .isISO8601()
+      .withMessage('Completed date must be a valid ISO 8601 date'),
     body('notes')
       .optional()
-      .isLength({ max: 2000 })
-      .withMessage('Notes must be less than 2000 characters'),
-    body('tags')
+      .isLength({ max: 1000 })
+      .withMessage('Notes must be less than 1000 characters')
+  ]
+};
+
+// Goal validation
+const goalValidation = {
+  create: [
+    body('title')
+      .trim()
+      .notEmpty()
+      .withMessage('Goal title is required')
+      .isLength({ min: 1, max: 200 })
+      .withMessage('Title must be between 1 and 200 characters'),
+    body('description')
       .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Description must be less than 1000 characters'),
+    body('category')
+      .isIn(['Networking', 'Applications', 'Interviews', 'Learning', 'Personal'])
+      .withMessage('Invalid goal category'),
+    body('type')
+      .optional()
+      .isIn(['Count', 'Percentage', 'Binary'])
+      .withMessage('Invalid goal type'),
+    body('target')
+      .isNumeric()
+      .withMessage('Target must be a number')
       .custom((value) => {
-        if (value !== undefined && !Array.isArray(value)) {
-          throw new Error('Tags must be an array');
-        }
-        if (Array.isArray(value)) {
-          for (const tag of value) {
-            if (typeof tag !== 'string' || tag.trim().length === 0 || tag.trim().length > 50) {
-              throw new Error('Each tag must be a string between 1 and 50 characters');
-            }
-          }
+        if (value <= 0) {
+          throw new Error('Target must be greater than 0');
         }
         return true;
-      })
+      }),
+    body('current')
+      .optional()
+      .isNumeric()
+      .withMessage('Current value must be a number'),
+    body('unit')
+      .optional()
+      .trim()
+      .isLength({ max: 20 })
+      .withMessage('Unit must be less than 20 characters'),
+    body('timeframe')
+      .isIn(['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly', 'Custom'])
+      .withMessage('Invalid timeframe'),
+    body('startDate')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('Start date must be in YYYY-MM-DD format'),
+    body('endDate')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('End date must be in YYYY-MM-DD format')
+      .custom((value, { req }) => {
+        if (new Date(value) <= new Date(req.body.startDate)) {
+          throw new Error('End date must be after start date');
+        }
+        return true;
+      }),
+    body('status')
+      .optional()
+      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
+      .withMessage('Invalid goal status')
   ],
   
   update: [
@@ -308,8 +313,6 @@ const contactValidation = {
       .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
       .withMessage('Invalid goal status')
   ]
-};
-
 };
 
 // Query parameter validation
@@ -727,6 +730,77 @@ module.exports = {
   validationMiddleware,
   validationHelpers
 };
+    body('networkingDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('lastContactDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('nextStepsDate')
+      .optional()
+      .custom((value) => {
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error('Date must be in YYYY-MM-DD format');
+        }
+        if (value && isNaN(Date.parse(value))) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
+    body('nextSteps')
+      .optional()
+      .isIn([
+        'Send Initial Outreach', 'Schedule Intro Call', 'Prepare for Upcoming Call',
+        'Send Thank You Email', 'Send Resume', 'Send Follow-Up Email',
+        'Schedule Follow-Up Call', '', null
+      ])
+      .withMessage('Invalid next steps value'),
+    body('referred')
+      .optional()
+      .custom((value) => {
+        if (value !== undefined && typeof value !== 'boolean' && value !== 'true' && value !== 'false') {
+          throw new Error('Referred must be true or false');
+        }
+        return true;
+      }),
+    body('notes')
+      .optional()
+      .isLength({ max: 2000 })
+      .withMessage('Notes must be less than 2000 characters'),
+    body('tags')
+      .optional()
+      .custom((value) => {
+        if (value !== undefined && !Array.isArray(value)) {
+          throw new Error('Tags must be an array');
+        }
+        if (Array.isArray(value)) {
+          for (const tag of value) {
+            if (typeof tag !== 'string' || tag.trim().length === 0 || tag.trim().length > 50) {
+              throw new Error('Each tag must be a string between 1 and 50 characters');
+            }
+          }
+        }
+        return true;
+      })
+  ],
+  
+  update: [
     param('id')
       .isMongoId()
       .withMessage('Invalid contact ID'),
@@ -1247,77 +1321,4 @@ const taskValidation = {
       .optional()
       .isIn(['High', 'Medium', 'Low'])
       .withMessage('Invalid priority level'),
-    body('actualDuration')
-      .optional()
-      .isInt({ min: 1, max: 600 })
-      .withMessage('Actual duration must be between 1 and 600 minutes'),
-    body('completedAt')
-      .optional()
-      .isISO8601()
-      .withMessage('Completed date must be a valid ISO 8601 date'),
-    body('notes')
-      .optional()
-      .isLength({ max: 1000 })
-      .withMessage('Notes must be less than 1000 characters')
-  ]
-};
-
-// Goal validation
-const goalValidation = {
-  create: [
-    body('title')
-      .trim()
-      .notEmpty()
-      .withMessage('Goal title is required')
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('description')
-      .optional()
-      .trim()
-      .isLength({ max: 1000 })
-      .withMessage('Description must be less than 1000 characters'),
-    body('category')
-      .isIn(['Networking', 'Applications', 'Interviews', 'Learning', 'Personal'])
-      .withMessage('Invalid goal category'),
-    body('type')
-      .optional()
-      .isIn(['Count', 'Percentage', 'Binary'])
-      .withMessage('Invalid goal type'),
-    body('target')
-      .isNumeric()
-      .withMessage('Target must be a number')
-      .custom((value) => {
-        if (value <= 0) {
-          throw new Error('Target must be greater than 0');
-        }
-        return true;
-      }),
-    body('current')
-      .optional()
-      .isNumeric()
-      .withMessage('Current value must be a number'),
-    body('unit')
-      .optional()
-      .trim()
-      .isLength({ max: 20 })
-      .withMessage('Unit must be less than 20 characters'),
-    body('timeframe')
-      .isIn(['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly', 'Custom'])
-      .withMessage('Invalid timeframe'),
-    body('startDate')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('Start date must be in YYYY-MM-DD format'),
-    body('endDate')
-      .matches(/^\d{4}-\d{2}-\d{2}$/)
-      .withMessage('End date must be in YYYY-MM-DD format')
-      .custom((value, { req }) => {
-        if (new Date(value) <= new Date(req.body.startDate)) {
-          throw new Error('End date must be after start date');
-        }
-        return true;
-      }),
-    body('status')
-      .optional()
-      .isIn(['Active', 'Completed', 'Paused', 'Cancelled'])
-      .withMessage('Invalid goal status')
-  ]
+    ]
