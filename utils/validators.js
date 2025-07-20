@@ -798,7 +798,6 @@ module.exports = {
         }
         return true;
       })
-  ];
   
   update: [
     param('id')
