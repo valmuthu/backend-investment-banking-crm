@@ -206,7 +206,15 @@ router.post('/', contactValidation.create, handleValidationErrors, async (req, r
     // Check for duplicate contacts (same name and firm)
     const existingContact = await Contact.findOne({
       userId: req.user.id,
-      name: { $regex: new RegExp(`^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\const express = require('express');
+      name: { 
+        $regex: new RegExp(
+      `^${cleanedData.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      'i'
+    )
+  },
+  firm: cleanedData.firm
+});
+const express = require('express');
 const { Contact } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 const { contactValidation, paginationValidation, handleValidationErrors } = require('../utils/validators');
