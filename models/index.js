@@ -209,7 +209,7 @@ const interviewSchema = new mongoose.Schema({
   },
   nextStepsDate: { type: String }, // YYYY-MM-DD format to match frontend
   notes: { type: String },
-  referralContactId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact' },
+  referralContactId: { type: mongoose.Schema.Types.ObjectId, ref: 'Contact', default: null },
   rounds: [{
     stage: {
       type: String,
