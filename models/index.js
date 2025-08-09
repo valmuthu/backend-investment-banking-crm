@@ -180,7 +180,7 @@ const interviewSchema = new mongoose.Schema({
       'Final Round',
       'Offer Received',
       'Rejected',
-      'Withdrawn'
+      'Withdrawn',
       '', null
     ]
   },
