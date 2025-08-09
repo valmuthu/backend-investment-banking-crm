@@ -346,42 +346,64 @@ const interviewValidation = {
       .isLength({ min: 1, max: 100 })
       .withMessage('Position must be between 1 and 100 characters'),
     body('group')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .trim()
       .isLength({ max: 50 })
       .withMessage('Group must be less than 50 characters'),
     body('stage')
       .optional({ nullable: true, checkFalsy: true })
-      .isIn([
-        'Not Yet Applied', 'Applied', 'Phone Screen', 'First Round',
-        'Second Round', 'Third Round', 'Case Study', 'Superday',
-        'Final Round', 'Offer Received', 'Rejected', 'Withdrawn', '', null
-      ])
-      .withMessage('Invalid interview stage'),
+      .custom((value) => {
+        // Allow null, undefined, or empty string (will be converted to null)
+        if (value === '' || value === null || value === undefined) {
+          return true;
+        }
+        const validStages = [
+          'Not Yet Applied', 'Applied', 'Phone Screen', 'First Round',
+          'Second Round', 'Third Round', 'Case Study', 'Superday',
+          'Final Round', 'Offer Received', 'Rejected', 'Withdrawn'
+        ];
+        if (!validStages.includes(value)) {
+          throw new Error('Invalid interview stage');
+        }
+        return true;
+      }),
     body('stageDate')
       .optional({ nullable: true, checkFalsy: true })
       .isISO8601()
       .withMessage('Stage date must be a valid date'),
     body('nextSteps')
       .optional({ nullable: true, checkFalsy: true })
-      .isIn([
-        'Submit Application', 'Follow-Up on Application', 'Prepare for Upcoming Interview',
-        'Send Thank You Email', 'Submit Additional Materials', 'Follow-Up on Status',
-        'Schedule Next Round', 'Complete Case Study', 'Negotiate Offer', '', null
-      ])
-      .withMessage('Invalid next steps value'),
+      .custom((value) => {
+        // Allow null, undefined, or empty string (will be converted to null)
+        if (value === '' || value === null || value === undefined) {
+          return true;
+        }
+        const validNextSteps = [
+          'Submit Application', 'Follow-Up on Application', 'Prepare for Upcoming Interview',
+          'Send Thank You Email', 'Submit Additional Materials', 'Follow-Up on Status',
+          'Schedule Next Round', 'Complete Case Study', 'Negotiate Offer'
+        ];
+        if (!validNextSteps.includes(value)) {
+          throw new Error('Invalid next steps value');
+        }
+        return true;
+      }),
     body('nextStepsDate')
       .optional({ nullable: true, checkFalsy: true })
       .isISO8601()
       .withMessage('Next steps date must be a valid date'),
     body('notes')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters'),
     body('referralContactId')
       .optional({ nullable: true, checkFalsy: true })
       .custom((value) => {
-        if (value && !mongoose.Types.ObjectId.isValid(value)) {
+        // Allow null, undefined, or empty string (will be converted to null)
+        if (value === '' || value === null || value === undefined) {
+          return true;
+        }
+        if (!mongoose.Types.ObjectId.isValid(value)) {
           throw new Error('Invalid referral contact ID');
         }
         return true;
