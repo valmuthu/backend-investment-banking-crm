@@ -350,11 +350,6 @@ const interviewValidation = {
       .trim()
       .isLength({ max: 50 })
       .withMessage('Group must be less than 50 characters'),
-    body('office')
-      .optional()
-      .trim()
-      .isLength({ max: 50 })
-      .withMessage('Office must be less than 50 characters'),
     body('stage')
       .optional()
       .isIn([
@@ -367,18 +362,6 @@ const interviewValidation = {
       .optional()
       .isISO8601()
       .withMessage('Stage date must be a valid date'),
-    body('applicationDate')
-      .optional()
-      .isISO8601()
-      .withMessage('Application date must be a valid date'),
-    body('deadline')
-      .optional()
-      .isISO8601()
-      .withMessage('Deadline must be a valid date'),
-    body('priority')
-      .optional()
-      .isIn(['High', 'Medium', 'Low'])
-      .withMessage('Invalid priority level'),
     body('nextSteps')
       .optional()
       .isIn([
