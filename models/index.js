@@ -181,8 +181,8 @@ const interviewSchema = new mongoose.Schema({
       'Offer Received',
       'Rejected',
       'Withdrawn'
-    ],
-    default: 'Not Yet Applied'
+      '', null
+    ]
   },
   stageDate: { type: String }, // YYYY-MM-DD format to match frontend
   applicationDate: { type: String }, // YYYY-MM-DD format
