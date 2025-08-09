@@ -181,6 +181,7 @@ const interviewSchema = new mongoose.Schema({
       'Offer Received',
       'Rejected',
       'Withdrawn'
+      '', null
     ],
     default: 'Not Yet Applied'
   },
