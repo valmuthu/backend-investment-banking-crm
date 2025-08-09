@@ -351,7 +351,7 @@ const interviewValidation = {
       .isLength({ max: 50 })
       .withMessage('Group must be less than 50 characters'),
     body('stage')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn([
         'Not Yet Applied', 'Applied', 'Phone Screen', 'First Round',
         'Second Round', 'Third Round', 'Case Study', 'Superday',
@@ -363,7 +363,7 @@ const interviewValidation = {
       .isISO8601()
       .withMessage('Stage date must be a valid date'),
     body('nextSteps')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isIn([
         'Submit Application', 'Follow-Up on Application', 'Prepare for Upcoming Interview',
         'Send Thank You Email', 'Submit Additional Materials', 'Follow-Up on Status',
@@ -379,7 +379,7 @@ const interviewValidation = {
       .isLength({ max: 2000 })
       .withMessage('Notes must be less than 2000 characters'),
     body('referralContactId')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .custom((value) => {
         if (value && !mongoose.Types.ObjectId.isValid(value)) {
           throw new Error('Invalid referral contact ID');
