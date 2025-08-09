@@ -359,7 +359,7 @@ const interviewValidation = {
       ])
       .withMessage('Invalid interview stage'),
     body('stageDate')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isISO8601()
       .withMessage('Stage date must be a valid date'),
     body('nextSteps')
@@ -371,7 +371,7 @@ const interviewValidation = {
       ])
       .withMessage('Invalid next steps value'),
     body('nextStepsDate')
-      .optional()
+      .optional({ nullable: true, checkFalsy: true })
       .isISO8601()
       .withMessage('Next steps date must be a valid date'),
     body('notes')
