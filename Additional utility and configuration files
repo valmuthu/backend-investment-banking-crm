@@ -117,8 +117,7 @@ const interviewValidation = {
     body('position').trim().notEmpty().withMessage('Position is required'),
     body('date').notEmpty().withMessage('Date is required'),
     body('time').notEmpty().withMessage('Time is required'),
-    body('status').optional().isIn(['Scheduled', 'Confirmed', 'Completed', 'Cancelled', 'Rescheduled']),
-    body('stage').optional().isIn(['Phone Screen', 'First Round', 'Second Round', 'Final Round', 'Case Study'])
+    body('status').optional().isIn(['Scheduled', 'Confirmed', 'Completed', 'Cancelled', 'Rescheduled'])
   ]
 };
 
