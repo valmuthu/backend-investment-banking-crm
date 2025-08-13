@@ -360,7 +360,7 @@ const interviewValidation = {
         const validStages = [
           'Not Yet Applied', 'Applied', 'Phone Screen', 'First Round',
           'Second Round', 'Third Round', 'Case Study', 'Superday',
-          'Final Round', 'Offer Received', 'Rejected', 'Withdrawn'
+          'Final Round', 'Offer Received', 'Rejected', 'Withdrawn', ''
         ];
         if (!validStages.includes(value)) {
           throw new Error('Invalid interview stage');
